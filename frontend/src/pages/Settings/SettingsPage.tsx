@@ -1,23 +1,593 @@
+import { useState } from 'react'
+import { PageHeader } from '@/components/common/PageHeader'
+import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
+import { Slider } from '@/components/ui/slider'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
+import { toast } from 'sonner'
+import {
+  Wifi,
+  Palette,
+  Gamepad2,
+  Shield,
+  Info,
+  RotateCcw,
+  AlertCircle,
+} from 'lucide-react'
+import { useSettingsStore, defaultSettings } from '@/store/settingsStore'
+import { useEventLogStore } from '@/store/eventLogStore'
+import { isValidHost, isValidPort } from '@/utils/validators'
+import type { AppTheme, Density, Handedness, JoystickSize, UnitSystem } from '@/types'
 
 export function SettingsPage() {
+  const settings = useSettingsStore()
+  const addEvent = useEventLogStore((state) => state.addEvent)
+
+  // Local connection form state
+  const [hostInput, setHostInput] = useState(settings.connection.host)
+  const [backendPortInput, setBackendPortInput] = useState(String(settings.connection.backendPort))
+  const [rosbridgePortInput, setRosbridgePortInput] = useState(
+    String(settings.connection.rosbridgePort),
+  )
+  const [useSslInput, setUseSslInput] = useState(settings.connection.useSsl)
+
+  // Field validation errors
+  const [errors, setErrors] = useState<{
+    host?: string
+    backendPort?: string
+    rosbridgePort?: string
+  }>({})
+
+  // Reset confirmation dialog
+  const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false)
+
+  // Health check query state for About tab
+  const [healthStatus, setHealthStatus] = useState<string | null>(null)
+  const [isCheckingHealth, setIsCheckingHealth] = useState(false)
+
+  const handleSaveConnection = (e: React.FormEvent) => {
+    e.preventDefault()
+    const newErrors: typeof errors = {}
+
+    if (hostInput.trim() && !isValidHost(hostInput.trim())) {
+      newErrors.host =
+        'Please enter a valid IPv4 address (e.g. 192.168.1.100) or hostname (e.g. jetson.local)'
+    }
+
+    if (!isValidPort(backendPortInput)) {
+      newErrors.backendPort = 'Port must be an integer between 1 and 65535'
+    }
+
+    if (!isValidPort(rosbridgePortInput)) {
+      newErrors.rosbridgePort = 'Port must be an integer between 1 and 65535'
+    }
+
+    setErrors(newErrors)
+    if (Object.keys(newErrors).length > 0) {
+      toast.error('Invalid connection settings', {
+        description: 'Please correct the highlighted errors before saving.',
+      })
+      return
+    }
+
+    settings.updateConnection({
+      host: hostInput.trim(),
+      backendPort: Number(backendPortInput),
+      rosbridgePort: Number(rosbridgePortInput),
+      useSsl: useSslInput,
+    })
+
+    addEvent({
+      type: 'settings',
+      title: 'Connection Settings Saved',
+      detail: `Target host set to ${hostInput.trim() || 'empty'}`,
+    })
+
+    toast.success('Settings saved to local storage')
+  }
+
+  const handleTestConnection = () => {
+    toast.info('Test Connection is disabled in Phase 1', {
+      description: 'Dynamic IP discovery and ping latency tests are implemented in Phase 3.',
+    })
+  }
+
+  const handleCheckBackendHealth = async () => {
+    if (!settings.connection.host) {
+      toast.error('No host configured', { description: 'Please enter a host IP address first.' })
+      return
+    }
+
+    setIsCheckingHealth(true)
+    setHealthStatus(null)
+    const protocol = settings.connection.useSsl ? 'https' : 'http'
+    const targetUrl = `${protocol}://${settings.connection.host}:${settings.connection.backendPort}/api/health`
+
+    try {
+      const res = await fetch(targetUrl, { signal: AbortSignal.timeout(3000) })
+      if (res.ok) {
+        const data = await res.json()
+        setHealthStatus(`Online: ${data.service} (v${data.version})`)
+        toast.success('Backend is reachable!')
+      } else {
+        setHealthStatus(`Error response: HTTP ${res.status}`)
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Connection failed'
+      setHealthStatus(`Unreachable: ${msg}`)
+      toast.error('Failed to reach backend')
+    } finally {
+      setIsCheckingHealth(false)
+    }
+  }
+
+  const handleResetDefaults = () => {
+    settings.resetToDefaults()
+    setHostInput(defaultSettings.connection.host)
+    setBackendPortInput(String(defaultSettings.connection.backendPort))
+    setRosbridgePortInput(String(defaultSettings.connection.rosbridgePort))
+    setUseSslInput(defaultSettings.connection.useSsl)
+    setErrors({})
+    toast.success('Settings reset to factory defaults')
+  }
+
   return (
-    <div className="p-4 md:p-6 space-y-4">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-xl md:text-2xl font-bold">Settings</CardTitle>
-            <Badge variant="outline">Phase 3</Badge>
-          </div>
-          <CardDescription>
-            Network IP connection configuration and application preferences
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">Not implemented — planned for Phase 3</p>
-        </CardContent>
-      </Card>
+    <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-6">
+      <PageHeader
+        title="Settings"
+        description="Network configuration, driving preferences, appearance, and system safety"
+        phase="1 UI / 3 Conn"
+      />
+
+      <Tabs defaultValue="connection" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 h-auto p-1 mb-6">
+          <TabsTrigger value="connection" className="min-h-[44px] text-xs">
+            <Wifi className="h-4 w-4 mr-1.5" />
+            Connection
+          </TabsTrigger>
+          <TabsTrigger value="appearance" className="min-h-[44px] text-xs">
+            <Palette className="h-4 w-4 mr-1.5" />
+            Appearance
+          </TabsTrigger>
+          <TabsTrigger value="control" className="min-h-[44px] text-xs">
+            <Gamepad2 className="h-4 w-4 mr-1.5" />
+            Controls
+          </TabsTrigger>
+          <TabsTrigger value="safety" className="min-h-[44px] text-xs">
+            <Shield className="h-4 w-4 mr-1.5" />
+            Safety
+          </TabsTrigger>
+          <TabsTrigger value="about" className="min-h-[44px] text-xs">
+            <Info className="h-4 w-4 mr-1.5" />
+            About
+          </TabsTrigger>
+        </TabsList>
+
+        {/* 1. Connection Settings Tab */}
+        <TabsContent value="connection">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-semibold">Robot Network Configuration</CardTitle>
+              <CardDescription className="text-xs">
+                Target IP address or hostname of your NVIDIA Jetson host. Settings are persisted in
+                local storage.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSaveConnection} className="space-y-4 max-w-xl">
+                <div className="space-y-1.5">
+                  <Label htmlFor="host-address">Robot Host Address (IP or Hostname)</Label>
+                  <Input
+                    id="host-address"
+                    value={hostInput}
+                    onChange={(e) => setHostInput(e.target.value)}
+                    placeholder="192.168.x.x or jetson.local"
+                    className="font-mono min-h-[44px]"
+                  />
+                  {errors.host ? (
+                    <p className="text-xs text-rose-500 font-medium flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" />
+                      {errors.host}
+                    </p>
+                  ) : (
+                    <p className="text-[11px] text-muted-foreground">
+                      Enter the local Wi-Fi IP address or mDNS hostname (.local) assigned to the
+                      Jetson.
+                    </p>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="backend-port">FastAPI Backend Port</Label>
+                    <Input
+                      id="backend-port"
+                      value={backendPortInput}
+                      onChange={(e) => setBackendPortInput(e.target.value)}
+                      placeholder="8000"
+                      className="font-mono min-h-[44px]"
+                    />
+                    {errors.backendPort && (
+                      <p className="text-xs text-rose-500">{errors.backendPort}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="rosbridge-port">rosbridge WebSocket Port</Label>
+                    <Input
+                      id="rosbridge-port"
+                      value={rosbridgePortInput}
+                      onChange={(e) => setRosbridgePortInput(e.target.value)}
+                      placeholder="9090"
+                      className="font-mono min-h-[44px]"
+                    />
+                    {errors.rosbridgePort && (
+                      <p className="text-xs text-rose-500">{errors.rosbridgePort}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-lg border border-border">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="ssl-toggle" className="cursor-pointer">
+                      Use Secure Sockets (HTTPS / WSS)
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Enable if reverse-proxy TLS termination is configured on the Jetson (Planned
+                      Phase 13).
+                    </p>
+                  </div>
+                  <Switch id="ssl-toggle" checked={useSslInput} onCheckedChange={setUseSslInput} />
+                </div>
+
+                <div className="flex items-center gap-3 pt-2">
+                  <Button type="submit" className="min-h-[44px]">
+                    Save Settings
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleTestConnection}
+                    className="min-h-[44px]"
+                  >
+                    Test Connection
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* 2. Appearance Tab */}
+        <TabsContent value="appearance">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-semibold">
+                Display & Visual Preferences
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Theme and accessibility options for console readability.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6 max-w-xl">
+              <div className="flex items-center justify-between py-2 border-b border-border">
+                <div>
+                  <Label>Color Theme</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Dark-first theme designed for outdoor readability.
+                  </p>
+                </div>
+                <Select
+                  value={settings.appearance.theme}
+                  onValueChange={(val: AppTheme) => settings.updateAppearance({ theme: val })}
+                >
+                  <SelectTrigger className="w-36 min-h-[44px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="dark">Dark (Default)</SelectItem>
+                    <SelectItem value="light">Light</SelectItem>
+                    <SelectItem value="system">System</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center justify-between py-2 border-b border-border">
+                <div>
+                  <Label>Layout Density</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Controls spacing between telemetry cards.
+                  </p>
+                </div>
+                <Select
+                  value={settings.appearance.density}
+                  onValueChange={(val: Density) => settings.updateAppearance({ density: val })}
+                >
+                  <SelectTrigger className="w-36 min-h-[44px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="comfortable">Comfortable</SelectItem>
+                    <SelectItem value="compact">Compact</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center justify-between py-2 border-b border-border">
+                <div>
+                  <Label>Unit System</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Units for metric telemetry readouts.
+                  </p>
+                </div>
+                <Select
+                  value={settings.appearance.units}
+                  onValueChange={(val: UnitSystem) => settings.updateAppearance({ units: val })}
+                >
+                  <SelectTrigger className="w-36 min-h-[44px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="metric">Metric (m, km/h)</SelectItem>
+                    <SelectItem value="imperial">Imperial (ft, mph)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center justify-between py-2">
+                <div className="space-y-0.5">
+                  <Label htmlFor="reduce-motion">Reduce Motion</Label>
+                  <p className="text-xs text-muted-foreground">Disable subtle animations.</p>
+                </div>
+                <Switch
+                  id="reduce-motion"
+                  checked={settings.appearance.reduceMotion}
+                  onCheckedChange={(val) => settings.updateAppearance({ reduceMotion: val })}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* 3. Control Preferences Tab */}
+        <TabsContent value="control">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-semibold">Touch & Gamepad Preferences</CardTitle>
+              <CardDescription className="text-xs">
+                Tune driving responsiveness and virtual joystick behavior.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6 max-w-xl">
+              <div className="flex items-center justify-between py-2 border-b border-border">
+                <div>
+                  <Label>Joystick Size</Label>
+                  <p className="text-xs text-muted-foreground">Physical touch target radius.</p>
+                </div>
+                <Select
+                  value={settings.control.joystickSize}
+                  onValueChange={(val: JoystickSize) =>
+                    settings.updateControl({ joystickSize: val })
+                  }
+                >
+                  <SelectTrigger className="w-36 min-h-[44px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="sm">Small (140px)</SelectItem>
+                    <SelectItem value="md">Medium (180px)</SelectItem>
+                    <SelectItem value="lg">Large (220px)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center justify-between py-2 border-b border-border">
+                <div>
+                  <Label>Handedness</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Preferred thumb dominance in landscape mode.
+                  </p>
+                </div>
+                <Select
+                  value={settings.control.handedness}
+                  onValueChange={(val: Handedness) => settings.updateControl({ handedness: val })}
+                >
+                  <SelectTrigger className="w-36 min-h-[44px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="right">Right-Handed</SelectItem>
+                    <SelectItem value="left">Left-Handed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center justify-between py-2 border-b border-border">
+                <div className="space-y-0.5">
+                  <Label htmlFor="invert-x">Invert Steering (Horizontal Axis)</Label>
+                  <p className="text-xs text-muted-foreground">Reverse left/right drive vector.</p>
+                </div>
+                <Switch
+                  id="invert-x"
+                  checked={settings.control.invertX}
+                  onCheckedChange={(val) => settings.updateControl({ invertX: val })}
+                />
+              </div>
+
+              <div className="flex items-center justify-between py-2 border-b border-border">
+                <div className="space-y-0.5">
+                  <Label htmlFor="invert-y">Invert Throttle (Vertical Axis)</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Reverse forward/reverse drive vector.
+                  </p>
+                </div>
+                <Switch
+                  id="invert-y"
+                  checked={settings.control.invertY}
+                  onCheckedChange={(val) => settings.updateControl({ invertY: val })}
+                />
+              </div>
+
+              <div className="flex items-center justify-between py-2">
+                <div className="space-y-0.5">
+                  <Label htmlFor="deadman-pref">Enforce Dead-Man Switch</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Require continuous touch contact while driving.
+                  </p>
+                </div>
+                <Switch
+                  id="deadman-pref"
+                  checked={settings.control.deadmanRequired}
+                  onCheckedChange={(val) => settings.updateControl({ deadmanRequired: val })}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* 4. Safety Limits Tab (Preview) */}
+        <TabsContent value="safety">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-semibold">Safety & Watchdog Limits</CardTitle>
+              <CardDescription className="text-xs">
+                Software constraints enforced on the robot controller.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6 max-w-xl">
+              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-500 text-xs">
+                <strong>Safety Preview Note:</strong> These speed limits and watchdog thresholds
+                will be enforced by the backend safety supervisor in Phase 13.
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex justify-between items-center text-xs">
+                  <Label>Maximum Speed Cap Percentage</Label>
+                  <span className="font-mono font-bold text-primary">
+                    {settings.safety.maxSpeedPct}%
+                  </span>
+                </div>
+                <Slider
+                  min={10}
+                  max={100}
+                  step={5}
+                  value={[settings.safety.maxSpeedPct]}
+                  onValueChange={(val) => settings.updateSafety({ maxSpeedPct: val[0] })}
+                  className="py-1"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Limits maximum motor output across manual, assisted, and autonomous driving.
+                </p>
+              </div>
+
+              <div className="space-y-2 pt-3 border-t border-border">
+                <div className="flex justify-between items-center text-xs">
+                  <Label>Watchdog Command Timeout</Label>
+                  <span className="font-mono font-bold">{settings.safety.commandTimeoutMs} ms</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  If the robot does not receive a keepalive command within this interval, motors
+                  immediately halt.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* 5. About & Maintenance Tab */}
+        <TabsContent value="about">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-semibold">
+                Application Metadata & Diagnostics
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Version build information and factory reset tools.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6 max-w-xl">
+              <div className="space-y-2 text-xs">
+                <div className="flex justify-between py-1 border-b border-border">
+                  <span className="text-muted-foreground">App Name</span>
+                  <span className="font-medium">JetRacer Control Center</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-border">
+                  <span className="text-muted-foreground">Version</span>
+                  <span className="font-mono">v0.2.0 (Phase 1 UI)</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-border">
+                  <span className="text-muted-foreground">Environment</span>
+                  <Badge variant="outline" className="text-[10px] uppercase font-mono">
+                    {import.meta.env.MODE}
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Optional Health Check Diagnostic */}
+              <div className="p-4 rounded-lg bg-muted/30 border border-border space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold">Backend Link Verification</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCheckBackendHealth}
+                    disabled={isCheckingHealth}
+                    className="min-h-[44px] sm:min-h-[32px] text-xs"
+                  >
+                    {isCheckingHealth ? 'Pinging...' : 'Check Health'}
+                  </Button>
+                </div>
+                {healthStatus && (
+                  <p className="text-xs font-mono text-muted-foreground bg-card p-2 rounded border border-border">
+                    {healthStatus}
+                  </p>
+                )}
+              </div>
+
+              <div className="pt-4 border-t border-border flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-rose-500">Factory Reset</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Restore all settings to initial defaults.
+                  </p>
+                </div>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setIsResetConfirmOpen(true)}
+                  className="min-h-[44px] sm:min-h-[36px]"
+                >
+                  <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                  Reset Defaults
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Factory Reset Confirmation Dialog */}
+      <ConfirmDialog
+        open={isResetConfirmOpen}
+        onOpenChange={setIsResetConfirmOpen}
+        title="Reset All Settings to Defaults?"
+        description="This will clear your stored robot host IP, appearance, and driving preferences. This action cannot be undone."
+        variant="destructive"
+        confirmText="Reset Everything"
+        onConfirm={handleResetDefaults}
+      />
     </div>
   )
 }
