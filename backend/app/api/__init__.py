@@ -1,10 +1,5 @@
-"""API endpoints package."""
+"""API package containing route definitions."""
 
-from fastapi import APIRouter
-
-from app.api.health import router as health_router
-
-api_router = APIRouter(prefix="/api")
-api_router.include_router(health_router, tags=["Health"])
+from app.api.router import api_router
 
 __all__ = ["api_router"]
