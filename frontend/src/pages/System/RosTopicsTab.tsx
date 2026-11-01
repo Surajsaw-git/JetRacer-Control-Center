@@ -125,7 +125,10 @@ export function RosTopicsTab({ onSwitchToWatch }: RosTopicsTabProps) {
             </div>
 
             <Select value={selectedType} onValueChange={setSelectedType}>
-              <SelectTrigger className="w-full sm:w-[220px] h-9 text-xs">
+              <SelectTrigger
+                aria-label="Filter by message type"
+                className="w-full sm:w-[220px] h-9 text-xs"
+              >
                 <SlidersHorizontal className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
                 <SelectValue placeholder="Filter by type" />
               </SelectTrigger>
@@ -147,7 +150,7 @@ export function RosTopicsTab({ onSwitchToWatch }: RosTopicsTabProps) {
                 rosDiscoveryService.setRefreshInterval(Number(val) as DiscoveryInterval)
               }
             >
-              <SelectTrigger className="w-[130px] h-9 text-xs">
+              <SelectTrigger aria-label="Auto-refresh interval" className="w-[130px] h-9 text-xs">
                 <Clock className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
                 <SelectValue placeholder="Auto-refresh" />
               </SelectTrigger>

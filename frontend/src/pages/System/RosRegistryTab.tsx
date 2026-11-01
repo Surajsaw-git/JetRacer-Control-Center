@@ -169,6 +169,7 @@ export function RosRegistryTab() {
               ref={fileInputRef}
               onChange={handleFileChange}
               accept=".json"
+              aria-label="Import registry profile JSON"
               className="hidden"
             />
             <Button
@@ -226,7 +227,10 @@ export function RosRegistryTab() {
                       value={mapping.assignedTopic ?? '__unmapped__'}
                       onValueChange={(val) => handleTopicAssign(role, val)}
                     >
-                      <SelectTrigger className="w-56 h-8 text-xs font-mono">
+                      <SelectTrigger
+                        className="w-56 h-8 text-xs font-mono"
+                        aria-label={`Select topic for ${role}`}
+                      >
                         <SelectValue placeholder="Select topic..." />
                       </SelectTrigger>
                       <SelectContent>

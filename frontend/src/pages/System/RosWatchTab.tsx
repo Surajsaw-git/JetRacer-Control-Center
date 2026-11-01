@@ -61,7 +61,7 @@ export function RosWatchTab() {
                   useSubscriptionStore.getState().setThrottleRateMs(Number(val))
                 }
               >
-                <SelectTrigger className="w-28 h-8 text-xs font-mono">
+                <SelectTrigger aria-label="Throttle rate" className="w-28 h-8 text-xs font-mono">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -78,7 +78,7 @@ export function RosWatchTab() {
             {/* Quick Watch Selector */}
             {discoveredTopics.length > 0 && activeCount < maxWatches && (
               <Select onValueChange={handleQuickWatch}>
-                <SelectTrigger className="w-48 h-8 text-xs font-mono">
+                <SelectTrigger aria-label="Quick watch topic" className="w-48 h-8 text-xs font-mono">
                   <SelectValue placeholder="Quick Watch Topic..." />
                 </SelectTrigger>
                 <SelectContent>

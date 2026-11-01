@@ -88,3 +88,16 @@ Verify that the terminal output reports:
 1. In **System -> Status**, click **Export Inspection Report**.
 2. Verify that the robot IP is masked by default (`xxx.xxx.xxx.105`).
 3. Click **Copy** or **Download** to save the report file to `docs/` for git commit and reference.
+
+---
+
+### Step 7: Confirm No Publisher Count Increases (Strict Read-Only Verification)
+To guarantee that the app is 100% read-only and never publishes or advertises on the robot:
+1. In an SSH session on the Jetson, check publishers for `/cmd_vel` (or any other topic):
+   ```bash
+   rostopic info /cmd_vel
+   ```
+2. Note the `Publishers:` count and node names.
+3. Keep the app open, navigate through **System -> Topics**, **Watch**, **Registry**, and **Dashboard**.
+4. Run `rostopic info /cmd_vel` again on the Jetson shell.
+5. **Verify:** The publisher count must remain strictly identical. No rosbridge publisher or advertisement must appear.

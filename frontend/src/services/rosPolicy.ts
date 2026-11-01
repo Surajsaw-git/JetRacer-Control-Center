@@ -14,18 +14,43 @@
 /**
  * Verified Allow-List of read-only rosapi introspection services.
  * In Phase 4, ONLY these services may be invoked by the client.
+ *
+ * Each service has been verified against the official rosbridge/rosapi ROS 1 specification:
+ * - ROS wiki: http://wiki.ros.org/rosapi
+ * - Source repo: https://github.com/RobotWebTools/rosbridge_suite/tree/ros1/rosapi
  */
 export const ALLOWED_ROSAPI_SERVICES: Record<string, string> = {
+  // Returns current ROS time in secs/nsecs (http://wiki.ros.org/rosapi#get_time)
   '/rosapi/get_time': 'rosapi/GetTime',
+
+  // Returns list of all active published topic names (http://wiki.ros.org/rosapi#topics)
   '/rosapi/topics': 'rosapi/Topics',
+
+  // Returns message type for given topic (http://wiki.ros.org/rosapi#topic_type)
   '/rosapi/topic_type': 'rosapi/TopicType',
+
+  // Returns batch list of topic names and their message types (rosbridge_suite/rosapi/srv/TopicsAndRawTypes.srv)
   '/rosapi/topics_and_raw_types': 'rosapi/TopicsAndRawTypes',
+
+  // Returns list of active node names registered with master (http://wiki.ros.org/rosapi#nodes)
   '/rosapi/nodes': 'rosapi/Nodes',
+
+  // Returns subscriptions, publications, and services for a node (http://wiki.ros.org/rosapi#node_details)
   '/rosapi/node_details': 'rosapi/NodeDetails',
+
+  // Returns list of all active service names (http://wiki.ros.org/rosapi#services)
   '/rosapi/services': 'rosapi/Services',
+
+  // Returns service type string for given service name (http://wiki.ros.org/rosapi#service_type)
   '/rosapi/service_type': 'rosapi/ServiceType',
+
+  // Returns list of node names publishing to given topic (http://wiki.ros.org/rosapi#publishers)
   '/rosapi/publishers': 'rosapi/Publishers',
+
+  // Returns list of node names subscribed to given topic (http://wiki.ros.org/rosapi#subscribers)
   '/rosapi/subscribers': 'rosapi/Subscribers',
+
+  // Returns message type field definitions and typedefs (http://wiki.ros.org/rosapi#message_details)
   '/rosapi/message_details': 'rosapi/MessageDetails',
 } as const
 

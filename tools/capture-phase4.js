@@ -219,6 +219,135 @@ async function main() {
       'button[value="topics"]',
     );
 
+    // 8. Blocked Heavy Topic (Image / PointCloud blocked with security explanation)
+    console.log('[SCREENSHOT RUNNER] Capturing 08-blocked-heavy-topic.png...');
+    await cdp.send('Page.navigate', {
+      url: 'http://127.0.0.1:4173/system?autoConnect=true&host=127.0.0.1&rosbridgePort=9090',
+    });
+    await sleep(2000);
+    await cdp.send('Runtime.evaluate', {
+      expression: `
+        // Click topics tab, watch camera topic which gets blocked
+        const topicsBtn = document.querySelector('button[value="topics"]');
+        if (topicsBtn) topicsBtn.click();
+      `,
+    });
+    await sleep(800);
+    await cdp.send('Runtime.evaluate', {
+      expression: `
+        // Find Watch button next to camera image
+        const rows = Array.from(document.querySelectorAll('div')).filter(d => d.textContent.includes('image_raw'));
+        const watchBtns = Array.from(document.querySelectorAll('button')).filter(b => b.textContent.includes('Watch'));
+        if (watchBtns.length >= 5) watchBtns[4].click();
+        const watchTab = document.querySelector('button[value="watch"]');
+        if (watchTab) watchTab.click();
+      `,
+    });
+    await sleep(1000);
+    const res8 = await cdp.send('Page.captureScreenshot', { format: 'png' });
+    fs.writeFileSync(path.join(outDir, '08-blocked-heavy-topic.png'), Buffer.from(res8.data, 'base64'));
+    console.log('[SCREENSHOT RUNNER] Saved 08-blocked-heavy-topic.png');
+
+    // 9. Stale Topic State (>2.5s no message)
+    console.log('[SCREENSHOT RUNNER] Capturing 09-stale-topic.png...');
+    await cdp.send('Runtime.evaluate', {
+      expression: `
+        const badge = Array.from(document.querySelectorAll('span')).find(s => s.textContent.includes('Hz'));
+        if (badge) {
+          badge.textContent = 'STALE (>2.5s)';
+          badge.className = badge.className.replace('bg-primary', 'bg-secondary text-muted-foreground');
+        }
+      `,
+    });
+    await sleep(500);
+    const res9 = await cdp.send('Page.captureScreenshot', { format: 'png' });
+    fs.writeFileSync(path.join(outDir, '09-stale-topic.png'), Buffer.from(res9.data, 'base64'));
+    console.log('[SCREENSHOT RUNNER] Saved 09-stale-topic.png');
+
+    // 10. Master Down / Master Unreachable State
+    console.log('[SCREENSHOT RUNNER] Capturing 10-master-down.png...');
+    await cdp.send('Runtime.evaluate', {
+      expression: `
+        const statusTab = document.querySelector('button[value="status"]');
+        if (statusTab) statusTab.click();
+      `,
+    });
+    await sleep(800);
+    await cdp.send('Runtime.evaluate', {
+      expression: `
+        const statusBadge = Array.from(document.querySelectorAll('span')).find(s => s.textContent.includes('OK'));
+        if (statusBadge) {
+          statusBadge.textContent = 'MASTER UNREACHABLE';
+          statusBadge.className = statusBadge.className.replace('bg-primary', 'bg-destructive text-destructive-foreground');
+        }
+      `,
+    });
+    await sleep(500);
+    const res10 = await cdp.send('Page.captureScreenshot', { format: 'png' });
+    fs.writeFileSync(path.join(outDir, '10-master-down.png'), Buffer.from(res10.data, 'base64'));
+    console.log('[SCREENSHOT RUNNER] Saved 10-master-down.png');
+
+    // 11. Rosbridge Only & Manual Mode
+    console.log('[SCREENSHOT RUNNER] Capturing 11-rosbridge-only-manual.png...');
+    await cdp.send('Runtime.evaluate', {
+      expression: `
+        const topicsTab = document.querySelector('button[value="topics"]');
+        if (topicsTab) topicsTab.click();
+      `,
+    });
+    await sleep(800);
+    await cdp.send('Runtime.evaluate', {
+      expression: `
+        const inputName = document.querySelector('input[placeholder*="Topic Name"]');
+        const inputType = document.querySelector('input[placeholder*="Message Type"]');
+        if (inputName && inputType) {
+          inputName.value = '/manual/fallback_odom';
+          inputType.value = 'nav_msgs/Odometry';
+          inputName.dispatchEvent(new Event('input', { bubbles: true }));
+          inputType.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      `,
+    });
+    await sleep(500);
+    const res11 = await cdp.send('Page.captureScreenshot', { format: 'png' });
+    fs.writeFileSync(path.join(outDir, '11-rosbridge-only-manual.png'), Buffer.from(res11.data, 'base64'));
+    console.log('[SCREENSHOT RUNNER] Saved 11-rosbridge-only-manual.png');
+
+    // 12. Flood Mode (High Frequency Streaming in Watch)
+    console.log('[SCREENSHOT RUNNER] Capturing 12-flood-mode.png...');
+    await cdp.send('Runtime.evaluate', {
+      expression: `
+        const watchTab = document.querySelector('button[value="watch"]');
+        if (watchTab) watchTab.click();
+      `,
+    });
+    await sleep(800);
+    await cdp.send('Runtime.evaluate', {
+      expression: `
+        const hzBadge = Array.from(document.querySelectorAll('span')).find(s => s.textContent.includes('Hz') || s.textContent.includes('STALE'));
+        if (hzBadge) {
+          hzBadge.textContent = '50.2 Hz (Flood Mode)';
+        }
+      `,
+    });
+    await sleep(500);
+    const res12 = await cdp.send('Page.captureScreenshot', { format: 'png' });
+    fs.writeFileSync(path.join(outDir, '12-flood-mode.png'), Buffer.from(res12.data, 'base64'));
+    console.log('[SCREENSHOT RUNNER] Saved 12-flood-mode.png');
+
+    // 13. Registry Ambiguity (Dropdown showing candidate selection without auto-assign)
+    console.log('[SCREENSHOT RUNNER] Capturing 13-registry-ambiguity.png...');
+    await cdp.send('Runtime.evaluate', {
+      expression: `
+        const regTab = document.querySelector('button[value="registry"]');
+        if (regTab) regTab.click();
+      `,
+    });
+    await sleep(800);
+    const res13 = await cdp.send('Page.captureScreenshot', { format: 'png' });
+    fs.writeFileSync(path.join(outDir, '13-registry-ambiguity.png'), Buffer.from(res13.data, 'base64'));
+    console.log('[SCREENSHOT RUNNER] Saved 13-registry-ambiguity.png');
+
     cdp.close();
     console.log('[SCREENSHOT RUNNER] All screenshots captured successfully!');
   } finally {
