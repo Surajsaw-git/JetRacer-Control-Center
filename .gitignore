@@ -18,6 +18,11 @@ env/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+data/
+logs/
 
 # Environment configurations (keep examples)
 .env

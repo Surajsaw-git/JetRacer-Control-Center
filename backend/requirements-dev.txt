@@ -1,0 +1,5 @@
+# Development and Testing Tooling
+pytest-asyncio==1.4.1
+pytest-cov==7.1.0
+mypy==2.4.1
+coverage==7.17.0
