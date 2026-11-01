@@ -2,9 +2,14 @@
 
 JetRacer Control Center is a comprehensive, multi-platform robotics command and telemetry dashboard designed to control and monitor the NVIDIA JetRacer ROS AI Kit over a local Wi-Fi network. Running simultaneously as a responsive React web application, an installable Android mobile application (via Capacitor), and a desktop browser interface, it eliminates the need for direct SSH terminals or HDMI monitor connections during autonomous navigation, mapping, and driving experiments.
 
-> **PROJECT STATUS (PHASE 2 COMPLETED):**
-> Phase 2 Backend Foundation is complete. The backend features a FastAPI application factory with lifespan orchestration, liveness & readiness health probes, honest system metadata & capability manifests, a multiplexed WebSocket manager with room subscriptions & slow-client backpressure isolation, uniform error envelopes, request-ID tracing, and 91% test coverage.
-> **IMPORTANT:** All functionality is tested on the development host only and **not connected to real robot hardware yet**. All ROS configurations remain marked as **NOT YET INSPECTED**.
+> **PROJECT STATUS (PHASE 3 COMPLETED):**
+> Phase 3 IP Connection is complete. The system provides a reliable, honest, and diagnosable connection flow:
+> - **Link A (Robotics):** Direct WebSocket to `rosbridge_server` (port 9090) with strict Phase 3 read-only enforcement (`/rosapi/get_time`), connect timeout, exponential backoff with jitter, and battery-saving visibility handling.
+> - **Link B (Auxiliary Backend):** Non-blocking health probe to FastAPI (port 8000). Treated as optional in Phase 3.
+> - **Connection Wizard:** Full interactive staged connection UI in Settings with quick-fill mock, diagnostics export, and persistent E-Stop warnings.
+> - **Robot Runbook:** Field preparation scripts in `robot/` and complete live connection runbook in [`docs/FIRST_CONNECTION_RUNBOOK.md`](file:///d:/Project/JetRacer%20Control%20Center/docs/FIRST_CONNECTION_RUNBOOK.md).
+> - **Local Mock Server:** Dedicated dev-only mock server in `tools/mock-rosbridge/` for offline testing.
+> - **TESTING STATUS:** Tested against local mock only. **NOT YET TESTED ON PHYSICAL ROBOT.** Real ROS topics remain **NOT YET INSPECTED**.
 
 ---
 
@@ -81,12 +86,19 @@ $env:VITE_ENABLE_SIMULATION="true"; npm run dev
 ```
 *(Simulation code is automatically tree-shaken and completely excluded from production builds).*
 
+#### Running the Dev Mock Rosbridge Server (Offline Testing)
+```powershell
+cd frontend
+npm run mock:rosbridge
+# Starts mock rosbridge v2 WebSocket server on ws://127.0.0.1:9090
+```
+
 #### Frontend Quality Checks
 ```powershell
 cd frontend
 npm run typecheck    # TypeScript compiler check (tsc -b)
 npm run lint         # ESLint check
-npm run test         # Vitest unit & accessibility tests (31 tests)
+npm run test         # Vitest unit & accessibility tests (61 tests)
 npm run build        # Production bundle build
 ```
 

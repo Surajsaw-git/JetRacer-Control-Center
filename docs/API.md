@@ -12,7 +12,10 @@
 - **Time Representation:** All timestamps use UTC ISO 8601 formatting (`YYYY-MM-DDTHH:MM:SS.ffffff+00:00` or `...Z`).
 - **Request Tracing:** All HTTP requests accept an optional `X-Request-ID` header. If absent or invalid, a random UUIDv4 is assigned and returned in the `X-Request-ID` response header and logged.
 - **Security Headers:** Every API response attaches `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, and `Cache-Control: no-store, no-cache, must-revalidate`.
-- **CORS Policy:** Strictly restricted to configured explicit origins (`http://localhost:5173`, `http://127.0.0.1:5173`, `http://localhost`, `capacitor://localhost`). Wildcard `*` is prohibited in production mode.
+- **CORS Policy:** Strictly restricted to configured explicit origins (`http://localhost:5173`, `http://127.0.0.1:5173`, `http://localhost`, `capacitor://localhost`) or matching `ALLOWED_ORIGIN_REGEX` for LAN development. Wildcard `*` or match-all regex is strictly prohibited in production mode.
+- **Two-Link Architecture:**
+  - **Link A (Robotics):** `ws://<ROBOT_IP>:9090` handled by `rosbridge_suite` (`roslibjs`). Phase 3 is read-only (`/rosapi/get_time`).
+  - **Link B (Backend):** `http://<IP>:8000/api` handled by FastAPI for auxiliary persistence and telemetry cache. Optional in Phase 3.
 
 ---
 
