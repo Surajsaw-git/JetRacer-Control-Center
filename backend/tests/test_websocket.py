@@ -230,6 +230,33 @@ def test_ws_bad_origin_rejected(app):
         assert exc_info.value.code == CLOSE_POLICY_VIOLATION
 
 
+def test_ws_origin_regex_matches_lan_ip(test_settings):
+    """Test connection with origin matching ALLOWED_ORIGIN_REGEX succeeds."""
+    test_settings.ALLOWED_ORIGIN_REGEX = r"^https?://192\.168\.\d+\.\d+(:\d+)?$"
+    app_with_regex = create_app(test_settings)
+    with TestClient(app_with_regex) as client:
+        with client.websocket_connect(
+            "/api/v1/ws", headers={"Origin": "http://192.168.1.150:5173"}
+        ) as websocket:
+            raw = websocket.receive_text()
+            data = json.loads(raw)
+            assert data["type"] == "welcome"
+
+
+def test_ws_origin_regex_rejects_unmatched_origin(test_settings):
+    """Test connection with origin NOT matching ALLOWED_ORIGIN_REGEX is rejected with 4008."""
+    test_settings.ALLOWED_ORIGIN_REGEX = r"^https?://192\.168\.\d+\.\d+(:\d+)?$"
+    app_with_regex = create_app(test_settings)
+    with TestClient(app_with_regex) as client:
+        with pytest.raises(WebSocketDisconnect) as exc_info:
+            with client.websocket_connect(
+                "/api/v1/ws", headers={"Origin": "http://10.0.0.5:5173"}
+            ):
+                pass
+        assert exc_info.value.code == CLOSE_POLICY_VIOLATION
+
+
+
 def test_ws_max_connections_enforced(test_settings):
     """Test connecting beyond WS_MAX_CONNECTIONS is rejected with 4003."""
     # WS_MAX_CONNECTIONS is 3

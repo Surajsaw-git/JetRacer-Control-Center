@@ -27,6 +27,7 @@ class Settings(BaseSettings):
         "http://localhost",
         "capacitor://localhost",
     ]
+    ALLOWED_ORIGIN_REGEX: Optional[str] = None
 
     # Storage paths
     DATA_DIR: str = "./data"
@@ -62,6 +63,18 @@ class Settings(BaseSettings):
             return v
         return [v] if isinstance(v, str) else []
 
+    @field_validator("ALLOWED_ORIGIN_REGEX")
+    @classmethod
+    def validate_origin_regex(cls, v: Optional[str]) -> Optional[str]:
+        """Ensure ALLOWED_ORIGIN_REGEX compiles to a valid regular expression."""
+        if v is not None:
+            import re
+            try:
+                re.compile(v)
+            except re.error as exc:
+                raise ValueError(f"Invalid ALLOWED_ORIGIN_REGEX syntax: {exc}") from exc
+        return v
+
     @model_validator(mode="after")
     def validate_production_security(self) -> "Settings":
         """Enforce strict security constraints in production."""
@@ -70,10 +83,20 @@ class Settings(BaseSettings):
             if isinstance(self.ALLOWED_ORIGINS, list)
             else [self.ALLOWED_ORIGINS]
         )
-        if self.ENVIRONMENT.lower() == "production" and "*" in origins:
+        is_prod = self.ENVIRONMENT.lower() == "production"
+        if is_prod and "*" in origins:
             raise ValueError(
                 "Security violation: Wildcard '*' in ALLOWED_ORIGINS is prohibited in production."
             )
+        if is_prod and self.ALLOWED_ORIGIN_REGEX:
+            import re
+            # Check for patterns matching every origin or arbitrary external origins
+            pattern = re.compile(self.ALLOWED_ORIGIN_REGEX)
+            if pattern.search("https://arbitrary-untrusted-site.com"):
+                raise ValueError(
+                    "Security violation: ALLOWED_ORIGIN_REGEX wildcard matches arbitrary origins,"
+                    " prohibited in production."
+                )
         return self
 
     model_config = SettingsConfigDict(

@@ -125,7 +125,7 @@ class WebSocketManager:
         return True
 
     def validate_origin(self, websocket: WebSocket) -> bool:
-        """Verify client Origin header against configured ALLOWED_ORIGINS."""
+        """Verify client Origin header against ALLOWED_ORIGINS and ALLOWED_ORIGIN_REGEX."""
         origin = websocket.headers.get("origin")
         if not origin:
             # Native clients (Capacitor/Postman/local scripts) omit Origin header
@@ -136,7 +136,14 @@ class WebSocketManager:
             if isinstance(self._settings.ALLOWED_ORIGINS, list)
             else [self._settings.ALLOWED_ORIGINS]
         )
-        return origin in allowed
+        if origin in allowed:
+            return True
+
+        if self._settings.ALLOWED_ORIGIN_REGEX:
+            import re
+            return bool(re.search(self._settings.ALLOWED_ORIGIN_REGEX, origin))
+
+        return False
 
     async def connect(self, websocket: WebSocket) -> Optional[ConnectionState]:
         """Accept a new WebSocket connection enforcing capacity and origin checks."""
