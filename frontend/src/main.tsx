@@ -17,17 +17,27 @@ const queryClient = new QueryClient({
 
 // Initialize dark theme by default if not set
 try {
-  const stored = localStorage.getItem('jetracer_settings')
-  if (stored) {
-    const parsed = JSON.parse(stored)
-    const theme = parsed?.state?.appearance?.theme
-    if (theme === 'light') {
-      document.documentElement.classList.remove('dark')
+  const urlTheme = new URLSearchParams(window.location.search).get('theme')
+  if (urlTheme === 'light') {
+    document.documentElement.classList.remove('dark')
+    document.documentElement.classList.add('light')
+  } else if (urlTheme === 'dark') {
+    document.documentElement.classList.remove('light')
+    document.documentElement.classList.add('dark')
+  } else {
+    const stored = localStorage.getItem('jetracer_settings')
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      const theme = parsed?.state?.appearance?.theme
+      if (theme === 'light') {
+        document.documentElement.classList.remove('dark')
+        document.documentElement.classList.add('light')
+      } else {
+        document.documentElement.classList.add('dark')
+      }
     } else {
       document.documentElement.classList.add('dark')
     }
-  } else {
-    document.documentElement.classList.add('dark')
   }
 } catch {
   document.documentElement.classList.add('dark')

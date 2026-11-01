@@ -89,7 +89,7 @@ flowchart TD
 ## 4. Storage Architecture
 
 - **Primary Database:** Local SQLite database (`sqlite:///./data/jetracer.db`) stored on the Jetson flash storage. SQLite provides zero-configuration, zero-dependency embedded transactions ideal for single-robot deployments.
-- **Relational Schema Readiness:** Built on top of SQLAlchemy 2.0 ORM. All database access uses declarative models and session factories. If scaling to a multi-robot fleet or central telemetry server in the future, transitioning to PostgreSQL requires modifying only the `DATABASE_URL` environment configuration.
+- **Relational Schema Readiness:** Built on top of SQLAlchemy 2.1.6 (2.x ORM). All database access uses declarative models and session factories. If scaling to a multi-robot fleet or central telemetry server in the future, transitioning to PostgreSQL requires modifying only the `DATABASE_URL` environment configuration.
 - **Large Binary Files (Maps & Logs):** 2D SLAM maps (`.yaml` metadata and `.pgm` bitmap files) are stored directly on the Jetson filesystem under a dedicated storage directory, with file metadata, timestamps, and thumbnails catalogued in SQLite.
 
 ---

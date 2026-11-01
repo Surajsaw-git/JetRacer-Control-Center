@@ -11,8 +11,10 @@ import { useSettingsStore } from '@/store/settingsStore'
 import type { AppTheme } from '@/types'
 
 export function ThemeToggle() {
-  const theme = useSettingsStore((state) => state.appearance.theme)
+  const storedTheme = useSettingsStore((state) => state.appearance.theme)
   const updateAppearance = useSettingsStore((state) => state.updateAppearance)
+  const urlTheme = typeof window !== 'undefined' ? (new URLSearchParams(window.location.search).get('theme') as AppTheme | null) : null
+  const theme = urlTheme || storedTheme
 
   useEffect(() => {
     const root = document.documentElement
