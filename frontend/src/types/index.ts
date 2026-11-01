@@ -69,6 +69,97 @@ export interface ControlState {
   timestamp: number
 }
 
+/**
+ * Phase 4: ROS Introspection, Discovery & Registry Types
+ */
+export type RosMasterStatus =
+  | 'disconnected'
+  | 'unknown'
+  | 'rosbridge_only'
+  | 'ok'
+  | 'degraded'
+  | 'master_unreachable'
+
+export interface RosTopicInfo {
+  name: string
+  type: string
+  publishers?: string[]
+  subscribers?: string[]
+  status?: 'present' | 'new' | 'removed'
+}
+
+export interface RosNodeInfo {
+  name: string
+  publications?: string[]
+  subscriptions?: string[]
+  services?: string[]
+  status?: 'present' | 'new' | 'removed'
+}
+
+export interface RosServiceInfo {
+  name: string
+  type?: string
+  status?: 'present' | 'new' | 'removed'
+}
+
+export interface WatchedTopicData {
+  topic: string
+  type: string
+  hz: number
+  lastMessageTimestamp: number
+  isStale: boolean
+  messageCount: number
+  lastDecodedPayload: unknown
+  summaryStats?: {
+    rangesCount?: number
+    rangeMin?: number
+    rangeMax?: number
+    rangeMean?: number
+    angleMin?: number
+    angleMax?: number
+    intensityCount?: number
+  }
+  error?: string | null
+}
+
+export type TopicRole =
+  | 'cmd_vel'
+  | 'odometry'
+  | 'imu'
+  | 'laser_scan'
+  | 'occupancy_map'
+  | 'camera_image'
+  | 'joystick'
+  | 'tf'
+  | 'tf_static'
+  | 'battery'
+
+export type TopicRoleVerification =
+  | 'unmapped'
+  | 'mapped_unverified'
+  | 'verified_live'
+  | 'stale'
+  | 'missing'
+
+export interface TopicMapping {
+  role: TopicRole
+  expectedTypes: string[]
+  assignedTopic: string | null
+  detectedType: string | null
+  verification: TopicRoleVerification
+  lastSeenAt?: number | null
+  hz?: number | null
+  notes?: string
+}
+
+export interface TopicRegistryProfile {
+  version: '1.0.0'
+  profileName: string
+  robotHost: string
+  updatedAt: string
+  mappings: Record<TopicRole, TopicMapping>
+}
+
 export interface MapMeta {
   id: string
   name: string

@@ -2,14 +2,16 @@
 
 JetRacer Control Center is a comprehensive, multi-platform robotics command and telemetry dashboard designed to control and monitor the NVIDIA JetRacer ROS AI Kit over a local Wi-Fi network. Running simultaneously as a responsive React web application, an installable Android mobile application (via Capacitor), and a desktop browser interface, it eliminates the need for direct SSH terminals or HDMI monitor connections during autonomous navigation, mapping, and driving experiments.
 
-> **PROJECT STATUS (PHASE 3 COMPLETED):**
-> Phase 3 IP Connection is complete. The system provides a reliable, honest, and diagnosable connection flow:
-> - **Link A (Robotics):** Direct WebSocket to `rosbridge_server` (port 9090) with strict Phase 3 read-only enforcement (`/rosapi/get_time`), connect timeout, exponential backoff with jitter, and battery-saving visibility handling.
-> - **Link B (Auxiliary Backend):** Non-blocking health probe to FastAPI (port 8000). Treated as optional in Phase 3.
-> - **Connection Wizard:** Full interactive staged connection UI in Settings with quick-fill mock, diagnostics export, and persistent E-Stop warnings.
-> - **Robot Runbook:** Field preparation scripts in `robot/` and complete live connection runbook in [`docs/FIRST_CONNECTION_RUNBOOK.md`](file:///d:/Project/JetRacer%20Control%20Center/docs/FIRST_CONNECTION_RUNBOOK.md).
-> - **Local Mock Server:** Dedicated dev-only mock server in `tools/mock-rosbridge/` for offline testing.
-> - **TESTING STATUS:** Tested against local mock only. **NOT YET TESTED ON PHYSICAL ROBOT.** Real ROS topics remain **NOT YET INSPECTED**.
+> **PROJECT STATUS (PHASE 4 COMPLETED):**
+> Phase 4 ROS Integration & Topic Introspection is complete:
+> - **Capability Policy & Security Guard:** Strictly read-only operation. Zero velocity commands, zero advertising, zero parameter set/delete. Only 11 verified rosapi introspection services permitted.
+> - **Runtime ROS Master Status:** Heartbeat latency, clock offset calculation vs browser time with plain-language explanation, flapping protection / hysteresis.
+> - **ROS Discovery Service:** Concurrency-limited (max 4 concurrent requests), diff tracking highlighting new/removed topics and nodes, on-demand details inspector, auto-refresh intervals with visibility pausing, and manual topic fallback.
+> - **Controlled Topic Watcher:** On-demand topic inspection (max 5 watches), rate throttling (100ms-1000ms), heavy-type blocking (images, point clouds, occupancy grids), LaserScan summary reduction, defensive decoding (NaN/Infinity safety), and sliding-window measured Hz.
+> - **Topic Registry:** 10 typed application roles (`cmd_vel`, `odometry`, `imu`, `laser_scan`, `occupancy_map`, `camera_image`, `joystick`, `tf`, `tf_static`, `battery`). Topic suggestions filtered by expected types. Verification state machine with versioned JSON export/import schema.
+> - **System Management Interface:** Tabbed System Console (`Status`, `Topics`, `Nodes`, `Services`, `Watch`, `Registry`), Redacted ROS Inspection Report modal export, Dashboard `RosStatusCard`, and secondary Header ROS indicator.
+> - **Robot Runbook:** Complete field checklist in [`docs/PHASE4_ROBOT_VERIFICATION.md`](file:///d:/Project/JetRacer%20Control%20Center/docs/PHASE4_ROBOT_VERIFICATION.md).
+> - **TESTING STATUS:** Tested against extended local mock rosbridge v2 only. **NOT YET TESTED ON PHYSICAL ROBOT.** Real ROS topics remain **NOT YET INSPECTED** until college hardware visit.
 
 ---
 

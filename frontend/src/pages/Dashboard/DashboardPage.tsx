@@ -18,6 +18,7 @@ import { MetricCard } from '@/components/common/MetricCard'
 import { StatusBadge } from '@/components/common/StatusBadge'
 import { VideoViewport } from '@/components/common/VideoViewport'
 import { LidarCanvas } from '@/components/common/LidarCanvas'
+import { RosStatusCard } from '@/pages/Dashboard/RosStatusCard'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useConnectionStore } from '@/store/connectionStore'
@@ -98,6 +99,9 @@ export function DashboardPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* ROS 1 Master & Introspection Card */}
+      <RosStatusCard />
 
       {/* 2. Quick Status Telemetry Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">

@@ -295,3 +295,83 @@ Every connected client possesses an independent, bounded FIFO queue (`WS_SEND_QU
 - The manager's `send_to()` detects saturation non-blockingly via `put_nowait()`.
 - The saturated client is immediately disconnected with close code `4008` (Slow Client) and cleaned up.
 - **Other clients and the server broadcast pipeline are completely unaffected.**
+
+---
+
+## 5. Rosbridge WebSocket Protocol (Link A — Port 9090)
+
+Link A connects directly to the robot's `rosbridge_server` WebSocket endpoint on port `9090`. In Phase 4, the connection operates under a strict read-only capability policy.
+
+### 5.1 Protocol Frames
+
+#### Service Request (`call_service`)
+Client invocation of allow-listed rosapi services:
+```json
+{
+  "op": "call_service",
+  "id": "call_service:/rosapi/get_time:1",
+  "service": "/rosapi/get_time",
+  "args": {}
+}
+```
+
+#### Service Response (`service_response`)
+Robot response frame:
+```json
+{
+  "op": "service_response",
+  "id": "call_service:/rosapi/get_time:1",
+  "service": "/rosapi/get_time",
+  "values": {
+    "time": {
+      "secs": 1730500000,
+      "nsecs": 42000000
+    }
+  },
+  "result": true
+}
+```
+
+#### Controlled Topic Subscription (`subscribe`)
+Rate-throttled subscription for topic inspection (max 5 concurrent watches):
+```json
+{
+  "op": "subscribe",
+  "id": "subscribe:/mock_world/odom:1",
+  "topic": "/mock_world/odom",
+  "type": "nav_msgs/Odometry",
+  "throttle_rate": 200
+}
+```
+
+#### Topic Unsubscription (`unsubscribe`)
+```json
+{
+  "op": "unsubscribe",
+  "id": "subscribe:/mock_world/odom:1",
+  "topic": "/mock_world/odom"
+}
+```
+
+### 5.2 Topic Registry Export Schema (`version: 1.0.0`)
+Profiles exported and imported via the System Registry tab:
+```json
+{
+  "version": "1.0.0",
+  "profileName": "Default Profile",
+  "robotHost": "192.168.1.105",
+  "updatedAt": "2026-11-02T00:00:00.000Z",
+  "mappings": {
+    "cmd_vel": {
+      "role": "cmd_vel",
+      "expectedTypes": ["geometry_msgs/Twist"],
+      "assignedTopic": "/mock_world/cmd_vel",
+      "detectedType": "geometry_msgs/Twist",
+      "verification": "mapped_unverified",
+      "lastSeenAt": null,
+      "hz": null,
+      "notes": ""
+    }
+  }
+}
+```
