@@ -5,7 +5,8 @@
  * Speaks the rosbridge v2 protocol over WebSocket on port 9090.
  */
 
-import { WebSocketServer } from 'ws';
+import wsPkg from '../../frontend/node_modules/ws/index.js';
+const { WebSocketServer } = wsPkg;
 import http from 'http';
 
 const args = process.argv.slice(2);

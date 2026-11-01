@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Wifi,
   WifiOff,
@@ -27,17 +27,41 @@ export function ConnectionWizard() {
   const connectionState = useConnectionStore()
   const settings = useSettingsStore()
 
-  const [addressInput, setAddressInput] = useState(settings.connection.host || '')
-  const [rosbridgePortInput, setRosbridgePortInput] = useState(
-    String(settings.connection.rosbridgePort || 9090),
+  const getInitialValue = (key: string, fallback: string): string => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search).get(key)
+      if (p) return p
+    }
+    return fallback
+  }
+
+  const [addressInput, setAddressInput] = useState(() =>
+    getInitialValue('host', settings.connection.host || ''),
   )
-  const [backendPortInput, setBackendPortInput] = useState(
-    String(settings.connection.backendPort || 8000),
+  const [rosbridgePortInput, setRosbridgePortInput] = useState(() =>
+    getInitialValue('rosbridgePort', String(settings.connection.rosbridgePort || 9090)),
+  )
+  const [backendPortInput, setBackendPortInput] = useState(() =>
+    getInitialValue('backendPort', String(settings.connection.backendPort || 8000)),
   )
   const [showAdvancedPorts, setShowAdvancedPorts] = useState(false)
   const [validationError, setValidationError] = useState<string | null>(null)
   const [validationWarning, setValidationWarning] = useState<string | null>(null)
   const [maskIpInDiagnostics, setMaskIpInDiagnostics] = useState(true)
+
+  // Handle URL query parameter for automated connection
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const autoConnect = params.get('autoConnect') === 'true'
+    const targetHost = params.get('host') || addressInput
+
+    if (autoConnect && targetHost) {
+      const rPort = Number(params.get('rosbridgePort')) || Number(rosbridgePortInput) || 9090
+      const bPort = Number(params.get('backendPort')) || Number(backendPortInput) || 8000
+      rosbridgeClient.connect(targetHost, rPort, bPort)
+    }
+  }, [])
 
   const isConnected = connectionState.status === 'connected'
   const isConnecting = connectionState.status === 'connecting'
