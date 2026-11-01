@@ -1,85 +1,92 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import axe from 'axe-core'
 import App from './App'
-import { DashboardPage } from './pages/Dashboard'
-import { CameraPage } from './pages/Camera'
-import { LidarPage } from './pages/Lidar'
-import { MappingPage } from './pages/Mapping'
-import { NavigationPage } from './pages/Navigation'
-import { ControlPage } from './pages/Control'
-import { SystemPage } from './pages/System'
-import { SettingsPage } from './pages/Settings'
 
-describe('App Smoke Tests', () => {
-  it('renders without crashing and displays the default Dashboard placeholder', () => {
-    render(<App />)
-    expect(screen.getByRole('heading', { name: 'JetRacer Control' })).toBeInTheDocument()
-    expect(screen.getAllByText('Dashboard').length).toBeGreaterThan(0)
-    expect(screen.getByText('Not implemented — planned for Phase 1')).toBeInTheDocument()
+describe('App Shell & Navigation Gates', () => {
+  beforeEach(() => {
+    // Reset route history to root for clean test isolation
+    window.history.pushState({}, 'Test', '/')
   })
 
-  it('navigates to each route and displays the corresponding placeholder', async () => {
+  it('renders the application shell with E-STOP and Connection chip on the initial route', async () => {
+    render(<App />)
+
+    // Verify Shell Headers and E-Stop button
+    expect(screen.getByRole('button', { name: /Emergency Stop/i })).toBeInTheDocument()
+    expect(screen.getByLabelText(/Connection status/i)).toBeInTheDocument()
+
+    // Wait for lazy loaded Dashboard
+    expect(
+      await screen.findByRole('heading', { level: 1, name: /Robot Dashboard/i }, { timeout: 4000 }),
+    ).toBeInTheDocument()
+  })
+
+  it('navigates through core routes and displays their headers', async () => {
     const user = userEvent.setup()
     render(<App />)
 
-    // Control
-    const controlLinks = screen.getAllByRole('link', { name: /Control/i })
+    // Wait for Dashboard
+    expect(
+      await screen.findByRole('heading', { level: 1, name: /Robot Dashboard/i }, { timeout: 4000 }),
+    ).toBeInTheDocument()
+
+    // Navigate to Control
+    const controlLinks = screen.getAllByRole('link', { name: /^Control$/i })
     await user.click(controlLinks[0])
-    expect(await screen.findByText('Not implemented — planned for Phase 8')).toBeInTheDocument()
+    expect(
+      await screen.findByRole(
+        'heading',
+        { level: 1, name: /Manual Teleoperation/i },
+        { timeout: 4000 },
+      ),
+    ).toBeInTheDocument()
 
-    // Camera
-    const cameraLinks = screen.getAllByRole('link', { name: /Camera/i })
+    // Navigate to Camera
+    const cameraLinks = screen.getAllByRole('link', { name: /^Camera$/i })
     await user.click(cameraLinks[0])
-    expect(await screen.findByText('Not implemented — planned for Phase 5')).toBeInTheDocument()
+    expect(
+      await screen.findByRole(
+        'heading',
+        { level: 1, name: /Camera Streaming/i },
+        { timeout: 4000 },
+      ),
+    ).toBeInTheDocument()
 
-    // LiDAR
-    const lidarLinks = screen.getAllByRole('link', { name: /LiDAR/i })
-    await user.click(lidarLinks[0])
-    expect(await screen.findByText('Not implemented — planned for Phase 6')).toBeInTheDocument()
-
-    // Mapping
-    const mappingLinks = screen.getAllByRole('link', { name: /Mapping/i })
-    await user.click(mappingLinks[0])
-    expect(await screen.findByText('Not implemented — planned for Phase 7')).toBeInTheDocument()
-
-    // Navigation
-    const navLinks = screen.getAllByRole('link', { name: /Navigation/i })
-    await user.click(navLinks[0])
-    expect(await screen.findByText('Not implemented — planned for Phase 9')).toBeInTheDocument()
-
-    // System
-    const systemLinks = screen.getAllByRole('link', { name: /System/i })
-    await user.click(systemLinks[0])
-    expect(await screen.findByText('Not implemented — planned for Phase 10')).toBeInTheDocument()
-
-    // Settings
-    const settingsLinks = screen.getAllByRole('link', { name: /Settings/i })
+    // Navigate to Settings
+    const settingsLinks = screen.getAllByRole('link', { name: /^Settings$/i })
     await user.click(settingsLinks[0])
-    expect(await screen.findByText('Not implemented — planned for Phase 3')).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { level: 1, name: /^Settings$/i }, { timeout: 4000 }),
+    ).toBeInTheDocument()
 
-    // Back to Dashboard
-    const dashboardLinks = screen.getAllByRole('link', { name: /Dashboard/i })
-    await user.click(dashboardLinks[0])
-    expect(await screen.findByText('Not implemented — planned for Phase 1')).toBeInTheDocument()
+    // Navigate to History
+    const historyLinks = screen.getAllByRole('link', { name: /^History$/i })
+    await user.click(historyLinks[0])
+    expect(
+      await screen.findByRole('heading', { level: 1, name: /Event History/i }, { timeout: 4000 }),
+    ).toBeInTheDocument()
   })
 
-  it('renders all 8 page placeholder components directly', () => {
-    const pages = [
-      { Component: DashboardPage, text: 'Not implemented — planned for Phase 1' },
-      { Component: ControlPage, text: 'Not implemented — planned for Phase 8' },
-      { Component: CameraPage, text: 'Not implemented — planned for Phase 5' },
-      { Component: LidarPage, text: 'Not implemented — planned for Phase 6' },
-      { Component: MappingPage, text: 'Not implemented — planned for Phase 7' },
-      { Component: NavigationPage, text: 'Not implemented — planned for Phase 9' },
-      { Component: SystemPage, text: 'Not implemented — planned for Phase 10' },
-      { Component: SettingsPage, text: 'Not implemented — planned for Phase 3' },
-    ]
+  it('passes automated axe-core accessibility checks on dashboard layout', async () => {
+    const { container } = render(<App />)
 
-    for (const { Component, text } of pages) {
-      const { unmount } = render(<Component />)
-      expect(screen.getByText(text)).toBeInTheDocument()
-      unmount()
-    }
+    expect(
+      await screen.findByRole('heading', { level: 1, name: /Robot Dashboard/i }, { timeout: 4000 }),
+    ).toBeInTheDocument()
+
+    const results = await axe.run(container, {
+      rules: {
+        // In JSDOM color-contrast checks are often unmeasurable
+        'color-contrast': { enabled: false },
+      },
+    })
+
+    // Critical or serious accessibility violations must be 0
+    const criticalViolations = results.violations.filter(
+      (v) => v.impact === 'critical' || v.impact === 'serious',
+    )
+    expect(criticalViolations).toEqual([])
   })
 })
