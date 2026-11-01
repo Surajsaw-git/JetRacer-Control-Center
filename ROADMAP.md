@@ -18,7 +18,7 @@
 | :---: | :--- | :--- | :---: |
 | **0** | **Project Setup & Architecture** | Repository scaffolding, multi-platform structure, initial FastAPI backend, Vite+React+Tailwind frontend, Capacitor Android shell, test gates, and architecture docs. | **Done** |
 | **1** | **Frontend UI/UX** | Comprehensive dark-first robotics UI, responsive navigation (mobile bottom tabs / desktop sidebar), persistent E-Stop, touch joystick, 9 console modules, canvas visualizers, theme toggle, Zustand stores, unit tests, and isolated simulation mode. | **Done (UI only, not connected to robot, not hardware-tested)** |
-| **2** | **Backend Foundation** | Subsystem service interfaces, WebSocket manager, telemetry models, and error handling framework. | Not started |
+| **2** | **Backend Foundation** | FastAPI app factory, liveness/readiness probes, system metadata, sanitised config, multiplexed WebSocket manager with backpressure & rooms, uniform error envelopes, request-ID tracing, and 91% test coverage. | **Done (Backend skeleton, tested on dev machine only, not hardware-tested)** |
 | **3** | **IP Connection** | Dynamic robot IP discovery, ping latency monitoring, connection state machine, and connection persistence. | Not started |
 | **4** | **ROS Integration** | Live on-robot topic inspection, `rosbridge_suite` client, roslibjs bindings, and parameter service queries. | Not started |
 | **5** | **Camera** | Real-time video stream player (MJPEG/WebRTC), snapshot capture, frame rate scaling, and camera settings. | Not started |
@@ -110,11 +110,64 @@
   - Android APK: APK compilation was skipped because Android SDK is not installed on this Windows development machine. Web assets are fully synced to the native Android shell via `cap sync`.
 - **Hardware Verification:**
   - **NOT HARDWARE TESTED.** Verified solely in local web preview, Vitest unit/component suite, and JSDOM. No connection to robot hardware was established.
-- **Next Steps:** Proceed to Phase 2 (Backend Foundation) upon user approval.
+- **Next Steps:** Proceed to Phase 2 (Backend Foundation).
 
 ---
 
-## 5. Reusable Progress Report Template (Copy after each phase)
+## 5. Phase 2 Progress Report: Backend Foundation
+
+- **Date Completed:** 2026-11-01
+- **Status:** **Done (Backend skeleton, tested on dev machine only, not hardware-tested)**
+- **What Was Created / Modified:**
+  - **Part A (Phase 1 Audit):**
+    - Audited frontend dependencies: removed redundant `"cn"` package and unused `"next-themes"`; re-aliased `cn` in all 18 shadcn UI components to internal `@/lib/utils`.
+    - Proved tree-shaking: confirmed simulation marker `SIMULATION_MODULE_ACTIVE_MOCK_PAYLOAD_PHASE1` is absent from production builds.
+    - Added JSDOM `HTMLCanvasElement.prototype.getContext` stub in `test/setup.ts`, eliminating test noise.
+    - Generated 54 responsive UI screenshots across all 9 pages at 360x800, 800x360, and 1366x768 in dark and light themes under `docs/screenshots/phase1/` (all images < 125 kB).
+    - Aligned `SQLAlchemy 2.1.6` references across `README.md`, `docs/ARCHITECTURE.md`, and `requirements.txt`.
+    - Tagged `v0.2.1-phase1-audit` and merged to `main`.
+  - **Part B (Phase 2 Backend Foundation):**
+    - Application factory `create_app(settings: Optional[Settings] = None)` with full lifespan management, startup/shutdown hook registries (`core/lifecycle.py`), and OpenAPI interactive doc controls (disabled in production mode).
+    - Central configuration `core/config.py` using `pydantic-settings` with strict production validation (prohibits `*` origins in production), safe default `127.0.0.1` binding, and documented placeholders for Phase 4 (`ROSBRIDGE_URL`) and Phase 13 (`AUTH_ENABLED`, `SECRET_KEY`).
+    - Comprehensive `.env.example` documenting all configuration parameters.
+    - Uniform error envelope and domain exception hierarchy (`NotFoundError`, `ValidationFailedError`, `ServiceUnavailableError`, `AppError`) with zero internal traceback leakage on unhandled 500 errors.
+    - Contextvars-based Request-ID tracing middleware (`X-Request-ID` validation/generation), structured latency access logger, and security headers middleware (`X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `Cache-Control: no-store`).
+    - REST Endpoints:
+      - `GET /api/health`: Liveness probe returning application version and timestamp.
+      - `GET /api/health/ready`: Readiness probe checking settings, data storage write access, and WebSocket manager, with honest `"robot": "not_integrated"`.
+      - `GET /api/v1/info`: Metadata manifest reporting Python runtime, OS platform, process uptime, and honest capability map (`"not_implemented"` with target phase).
+      - `GET /api/v1/config`: Non-secret sanitized operational configuration.
+      - `GET /api/v1/ws/stats`: Real-time WebSocket connection count and room memberships.
+    - Multiplexed WebSocket Manager (`services/ws_manager.py` & `api/ws.py`):
+      - Framing envelope v1 (`type`, `id`, `channel`, `ts`, `payload`).
+      - Client-to-server handlers for `ping`, `echo` (test only), `subscribe`, `unsubscribe`.
+      - Server-to-client handlers for `welcome`, `pong`, `ack`, `subscribed`, `unsubscribed`, `error`, `event`.
+      - Bounded per-client send queue (`put_nowait`) with dedicated writer task, dropping slow/stalled clients (`4008`) without blocking broadcasts or fast clients.
+      - 30-second heartbeat inactivity watchdog (`4000`) and periodic system telemetry heartbeat on `system` channel.
+      - Channel allowlist (`system`, `echo-test`) and phase reservation enforcement rejecting future channels (`ros`, `camera`, `lidar`, `map`, `control`, `safety`) with `CHANNEL_NOT_AVAILABLE`.
+      - Origin validation and Phase 13 auth hook (`authenticate_ws`).
+    - Tooling & Live Smoke Script:
+      - `backend/scripts/ws_smoke.py`: Live end-to-end HTTP and WebSocket verification script.
+      - `backend/scripts/dev.ps1`: Windows PowerShell developer task runner (`run`, `test`, `lint`, `format`, `smoke`).
+- **Installed Packages & Versions:**
+  - `pytest-asyncio==1.4.1`, `pytest-cov==7.1.0`, `mypy==2.4.1`, `coverage==7.17.0` (pinned in `requirements-dev.txt`).
+- **Verification & Test Results:**
+  - Ruff format & lint (`ruff format .`, `ruff check .`): PASS (0 errors across 26 source files).
+  - Static type check (`mypy app`): PASS (0 errors across 26 source files).
+  - Pytest with coverage (`pytest --cov=app --cov-report=term-missing`): PASS (**41 passed tests, 91% total coverage**).
+  - Live smoke test (`ws_smoke.py` against live uvicorn server): PASS (All 5 verification stages green).
+  - Frontend regression gate (`typecheck`, `lint`, `test`, `build`, `cap sync`): PASS (31 tests passed, 0 errors, 100% green).
+- **Known Limitations & Issues:**
+  - Physical Robot: Never touched or connected. ROS topics remain strictly `NOT YET INSPECTED`.
+  - Jetson Python Compatibility: Installed dependencies require Python 3.10+ (and some 3.11+). If the Jetson runs an older OS (Ubuntu 18.04 with Python 3.6 or 20.04 with Python 3.8), the backend will require an isolated venv (via pyenv/deadsnakes), a container, or LAN offboard execution.
+  - Android APK: APK compilation skipped because Android SDK is not installed on the dev machine.
+- **Hardware Verification:**
+  - **NOT HARDWARE TESTED.** Verified exclusively on local development machine with simulated ASGI tests and live local loopback sockets.
+- **Next Steps:** Proceed to Phase 3 (IP Connection Flow) upon user approval.
+
+---
+
+## 6. Reusable Progress Report Template (Copy after each phase)
 
 ```markdown
 ### Phase X Progress Report: [Phase Title]

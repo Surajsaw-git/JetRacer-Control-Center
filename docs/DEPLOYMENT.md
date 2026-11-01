@@ -16,7 +16,39 @@
 
 ---
 
-## 2. On-Robot Backend Systemd Service
+## 2. On-Robot Backend Deployment Options (Phase 2 Strategy)
+
+Because modern FastAPI and dependencies require Python 3.10+, and the Jetson system Python may be older (e.g., 3.6 on Melodic or 3.8 on Noetic), three deployment options are available:
+
+### Option A: Isolated Python 3.11+ Venv on Jetson (Recommended if OS allows)
+Install Python 3.11+ via `pyenv` or deadsnakes without modifying system `/usr/bin/python3`.
+```bash
+# Draft run command (not executed on robot yet):
+cd /home/jetson/JetRacer-Control-Center/backend
+~/.pyenv/versions/3.11.9/bin/python -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+### Option B: Docker Container on Jetson
+Run backend in a container on the Jetson with host networking to access local ports and rosbridge:
+```bash
+# Draft run command (not executed on robot yet):
+docker run -d --name jetracer-backend \
+  --network host \
+  --restart unless-stopped \
+  -v /home/jetson/JetRacer-Control-Center/backend/data:/app/data \
+  -e ENVIRONMENT=production \
+  -e HOST=0.0.0.0 \
+  jetracer-backend:latest
+```
+
+### Option C: Offboard Host on Same LAN
+Run the backend on a development laptop or workstation connected to the same Wi-Fi router. The backend connects to the Jetson robot solely over WebSocket at `ws://<JETSON_IP>:9090` (Phase 4).
+
+---
+
+## 3. On-Robot Backend Systemd Service
 
 A systemd service file will be created in `robot/systemd/jetracer-backend.service` to ensure the FastAPI backend starts automatically upon boot:
 

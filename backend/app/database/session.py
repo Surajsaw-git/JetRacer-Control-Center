@@ -6,7 +6,9 @@ from typing import Generator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.core.config import settings
+from app.core.config import get_settings
+
+settings = get_settings()
 
 # Ensure data directory exists if using local SQLite file
 if settings.DATABASE_URL.startswith("sqlite"):
@@ -15,7 +17,7 @@ if settings.DATABASE_URL.startswith("sqlite"):
     if db_dir and not os.path.exists(db_dir):
         os.makedirs(db_dir, exist_ok=True)
 
-# Engine connection arguments (SQLite requires check_same_thread=False for multi-threaded FastAPI)
+# Engine connection arguments (SQLite requires check_same_thread=False)
 connect_args = {"check_same_thread": False} if settings.DATABASE_URL.startswith("sqlite") else {}
 
 engine = create_engine(
