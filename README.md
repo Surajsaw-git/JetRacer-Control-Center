@@ -2,9 +2,9 @@
 
 JetRacer Control Center is a comprehensive, multi-platform robotics command and telemetry dashboard designed to control and monitor the NVIDIA JetRacer ROS AI Kit over a local Wi-Fi network. Running simultaneously as a responsive React web application, an installable Android mobile application (via Capacitor), and a desktop browser interface, it eliminates the need for direct SSH terminals or HDMI monitor connections during autonomous navigation, mapping, and driving experiments.
 
-> **PROJECT STATUS (PHASE 1 COMPLETED):**
-> Phase 1 Frontend UI/UX is complete. The application features a dark-first console design system, responsive mobile & desktop navigation shells, virtual touch joystick with keyboard & gamepad support, interactive LiDAR & mapping canvases, 9 module pages, local settings persistence, and local event history.
-> **IMPORTANT:** All UI is preview-only and **not connected to real robot hardware yet**. All ROS configurations remain marked as **NOT YET INSPECTED**.
+> **PROJECT STATUS (PHASE 2 COMPLETED):**
+> Phase 2 Backend Foundation is complete. The backend features a FastAPI application factory with lifespan orchestration, liveness & readiness health probes, honest system metadata & capability manifests, a multiplexed WebSocket manager with room subscriptions & slow-client backpressure isolation, uniform error envelopes, request-ID tracing, and 91% test coverage.
+> **IMPORTANT:** All functionality is tested on the development host only and **not connected to real robot hardware yet**. All ROS configurations remain marked as **NOT YET INSPECTED**.
 
 ---
 
@@ -95,17 +95,19 @@ npm run build        # Production bundle build
 cd backend
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-# Access API at http://localhost:8000/api/health
-# Interactive Swagger docs: http://localhost:8000/docs
+pip install -r requirements.txt -r requirements-dev.txt
+uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+# Access API at http://127.0.0.1:8000/api/health
+# Interactive Swagger docs: http://127.0.0.1:8000/docs
+# WebSocket multiplexer: ws://127.0.0.1:8000/api/v1/ws
 ```
 
-Run backend quality checks:
+Run backend quality checks via `dev.ps1` helper:
 ```powershell
 cd backend
-.\.venv\Scripts\ruff check .
-.\.venv\Scripts\pytest
+.\scripts\dev.ps1 lint    # Ruff style check + Mypy static typecheck
+.\scripts\dev.ps1 test    # Pytest with terminal coverage report (41 tests, 91% coverage)
+.\scripts\dev.ps1 smoke   # Live HTTP + WebSocket smoke verification script
 ```
 
 ### 3. Capacitor Android

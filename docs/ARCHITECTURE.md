@@ -107,13 +107,77 @@ flowchart TD
 
 ---
 
-## 6. Python Version Compatibility Note (Jetson vs Development Host)
+## 6. Backend Runtime Strategy & Jetson Compatibility Matrix
 
-- **Development Environment:** Windows host running modern Python 3.14.
-- **Jetson Runtime Environment:** NVIDIA Jetson devices running JetPack 4.x / 5.x with Ubuntu 18.04 (ROS 1 Melodic) or Ubuntu 20.04 (ROS 1 Noetic) typically run **Python 3.6, Python 3.8, or Python 3.10**.
-- **Compatibility Guideline:**
-  - Backend source code must adhere strictly to Python 3.8+ compatible syntax (e.g., using `typing.List`, `typing.Optional`, `typing.Dict`, avoiding `match/case` statements and union operators `|` in type annotations).
-  - All dependency versions specified in `backend/requirements.txt` will be validated against the Jetson's specific Python runtime during Phase 15 deployment. If the Jetson runs Python 3.8, compatible wheels for FastAPI, Pydantic, and SQLAlchemy are available.
+### 6.1 Target Environment Facts & Unknowns
+At the start of Phase 2, physical Jetson hardware facts have **NOT YET BEEN INSPECTED**:
+```text
+Jetson model:            UNKNOWN
+JetPack / Ubuntu:        UNKNOWN   (e.g., Ubuntu 18.04 LTS or 20.04 LTS)
+ROS 1 distro:            UNKNOWN   (Melodic on 18.04 or Noetic on 20.04)
+System python3 version:  UNKNOWN   (Typically 3.6 on 18.04, 3.8 on 20.04)
+```
+
+### 6.2 Dependency Python Compatibility Matrix
+The following table reflects verified package metadata from PyPI distributions currently installed:
+
+| Package | Installed Version | Minimum Python Required | Notes |
+| :--- | :--- | :--- | :--- |
+| **fastapi** | `0.162.0` | `>= 3.10` | Uses Starlette 1.10+ async lifecycle and Pydantic v2 |
+| **uvicorn[standard]** | `0.54.0` | `>= 3.10` | ASGI web server |
+| **websockets** | `17.4` | `>= 3.11` | High-performance async WebSocket server |
+| **starlette** | `1.10.0` | `>= 3.11` | FastAPI core dependency |
+| **sqlalchemy** | `2.1.6` | `>= 3.11` | Async / typed ORM |
+| **pydantic** | `2.14.2` | `>= 3.10` | High-speed data validation via pydantic-core |
+| **pydantic-settings** | `2.16.2` | `>= 3.11` | Environment variable & dotenv loader |
+| **python-dotenv** | `1.2.4` | `>= 3.10` | `.env` parser |
+| **httpx** | `0.28.1` | `>= 3.8` | Async HTTP client for probes |
+| **pytest** | `9.2.0` | `>= 3.10` | Test runner |
+| **ruff** | `0.17.3` | `>= 3.7` | Fast linter & formatter |
+
+### 6.3 Deployment Options & Trade-Offs
+Because modern FastAPI, Pydantic 2, and SQLAlchemy 2.1+ require Python 3.10+, running the backend requires an environment providing Python 3.10+. Importantly, **the backend communicates with ROS solely via rosbridge over WebSocket (Port 9090)** in Phase 4. It **never imports `rospy`** directly. Therefore, the backend's Python runtime is completely decoupled from the system ROS Python environment.
+
+The deployment options are:
+1. **Dedicated Python 3.11+ Virtual Environment on Jetson (Recommended if OS allows):**
+   - Installed via `pyenv` or deadsnakes PPA without overwriting or interfering with `/usr/bin/python3`.
+   - *Pros:* Native execution, full hardware access (Tegrastats/jtop), direct LAN access.
+   - *Cons:* Requires compiling Python if PPA is unavailable on older JetPack / ARM64 builds.
+2. **Containerized Execution (Docker on Jetson):**
+   - Run the backend in a lightweight `python:3.11-slim` container on the Jetson with `--network host`.
+   - *Pros:* Fully isolated dependencies, zero risk of contaminating Jetson system libraries.
+   - *Cons:* Minor container overhead and requires Docker daemon running on Jetson.
+3. **Offboard Execution on LAN Host:**
+   - Run the backend on the operator laptop/server, connecting over Wi-Fi to the robot's rosbridge port.
+   - *Pros:* Zero CPU/RAM load on the Jetson.
+   - *Cons:* Relies on network reliability for backend-to-robot telemetry.
+
+### 6.4 Operator Checklist: Jetson Facts Needed
+To finalize the deployment strategy in Phase 15, run these read-only inspection commands on the Jetson terminal and provide the output:
+```bash
+# 1. OS & Distribution
+lsb_release -a
+
+# 2. System Python Version
+python3 --version
+
+# 3. ROS Distro
+rosversion -d
+
+# 4. NVIDIA JetPack / L4T Release
+cat /etc/nv_tegra_release
+
+# 5. Memory & Storage Headroom
+free -h
+df -h
+```
+*(Do not attempt to upgrade system packages or modify the Jetson environment.)*
+
+### 6.5 Source Code Syntax Guardrails
+To ensure future downgrades remain cost-free if an older Python runtime is mandated:
+- All source code uses `typing.Optional`, `typing.List`, `typing.Dict`, `typing.Union`, `typing.Any`.
+- Never use Python 3.10+ union pipe syntax in annotations (`X | Y`), always `Union[X, Y]`.
+- Never use Python 3.10+ structural pattern matching (`match / case`), use standard `if / elif / else`.
 
 ---
 
@@ -147,4 +211,63 @@ The client UI relies on lightweight, decoupled Zustand stores located in `fronte
 - Responsive breakpoints: Mobile (`< 768px`) utilizes an accessible top header and a fixed 5-item bottom tab bar (`Dashboard`, `Control`, `Camera`, `Nav/Map`, `More`); Tablet/Desktop (`>= 768px`) displays a collapsible left sidebar with full navigation.
 - Touch ergonomics: 44×44px minimum touch targets, hardware-accelerated High-DPI canvas (`PanZoomCanvas`, `LidarCanvas`), zero-dependency virtual touch joystick with pointer capture and automatic zeroing on window blur, pointer cancel, or touch release.
 - Persistent Emergency Stop: Sticky E-STOP button mounted in the application header across all viewports.
+
+---
+
+## 9. Backend Architecture (Phase 2 Foundation)
+
+### 9.1 Application Factory Pattern & Lifespan Orchestration
+The FastAPI application is instantiated through `create_app(settings: Optional[Settings] = None)` in `app/main.py`. This design isolates test runs from production state, permitting in-memory override of settings:
+- **Lifespan Startup:** Configures structured logging (`logging.dictConfig`), ensures `DATA_DIR` and `LOG_DIR` exist, verifies binding interfaces (emitting security warnings if bound to `0.0.0.0`), launches the WebSocket manager background watchdog tasks, and invokes registered startup hooks.
+- **Lifespan Shutdown:** Executes registered shutdown hooks in reverse registration order, signals the WebSocket manager to terminate background tasks, closes all active client sockets with code `1001` (Going Away), and flushes log handlers.
+
+### 9.2 HTTP Middleware Pipeline Execution Order
+Incoming HTTP requests pass through the following layered pipeline:
+```mermaid
+flowchart TD
+    Client["HTTP / WebSocket Client"] --> SecHdr["SecurityHeadersMiddleware\n(nosniff, no-referrer, no-store)"]
+    SecHdr --> AccLog["AccessLogMiddleware\n(Latency ms, path, status, request_id)"]
+    AccLog --> ReqID["RequestIdMiddleware\n(Validate or generate UUID4 X-Request-ID)"]
+    ReqID --> CORS["CORSMiddleware\n(Explicit ALLOWED_ORIGINS)"]
+    CORS --> Router["API Routers\n(/api/health, /api/v1/info, /api/v1/ws)"]
+```
+
+### 9.3 WebSocket Manager Architecture & Slow-Client Backpressure
+```mermaid
+flowchart LR
+    subgraph WsManager["WebSocketManager (Thread-Safe / Async-Safe)"]
+        Registry["Connection Registry\n(UUID -> ConnectionState)"]
+        Channels["Room Registry\n('system', 'echo-test')"]
+        Watchdog["Heartbeat Watchdog\n(30s Inactivity Timeout -> Code 4000)"]
+    end
+
+    subgraph ClientA["Fast Client A"]
+        QueueA["Bounded Send Queue (100)"]
+        WriterA["Writer Task A"]
+        SockA["WebSocket A"]
+    end
+
+    subgraph ClientB["Slow / Stalled Client B"]
+        QueueB["Bounded Send Queue (100)\n[FULL]"]
+        WriterB["Writer Task B"]
+        SockB["WebSocket B\n(Dropped -> Code 4008)"]
+    end
+
+    WsManager -->|Non-blocking put_nowait| QueueA --> WriterA --> SockA
+    WsManager -.->|QueueFull detected| SockB
+```
+
+### 9.4 Subsystem Extension Points
+Later phases integrate cleanly through documented hooks without modifying `app/main.py`:
+- **Phase 3 (Robot IP Reachability):** Added to `app/api/connection.py` and readiness probe components.
+- **Phase 4 (ROS Integration):** Rosbridge client lifecycle hooks registered via `register_startup_hook()` and `register_shutdown_hook()`.
+- **Phase 11 (Database Persistence):** SQLite session pooling registered via FastAPI dependencies and lifecycle migrations.
+- **Phase 13 (LAN Security & Authentication):** `authenticate_ws()` in `ws_manager.py` enforces JWT verification; security middleware checks Authorization headers.
+
+### 9.5 Real vs Simulated Data Policy (Backend)
+- **The backend never fabricates robot telemetry.**
+- In Phase 2, all capability states report `"not_implemented"` with their scheduled phase.
+- Readiness probes honestly report `"robot": "not_integrated"`.
+- WebSocket broadcasts on `"system"` contain solely real backend process metrics (server time, uptime seconds, active connections).
+
 
