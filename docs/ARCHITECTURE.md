@@ -120,4 +120,31 @@ flowchart TD
 ## 7. Real vs Simulated Data Policy
 
 - **Zero Mock / Fake Telemetry in Production:** No fake velocity values, synthesized camera streams, or simulated LiDAR ranges may be emitted by production backend services or UI pages.
-- **Explicit Labelling:** Any testing stubs or simulation adapters developed in Phase 14 must be isolated under separate test harnesses or clearly stamped with a visual "SIMULATED DATA" badge in the UI. In Phase 0, all pages remain pure placeholders stating the phase of intended implementation.
+- **Explicit Labelling:** Any testing stubs or simulation adapters developed in Phase 14 or enabled via local dev flags must be isolated under separate test harnesses or clearly stamped with a visual "SIMULATED DATA" badge in the UI. In Phase 0 & 1, all pages connect to a `NotConnectedClient` by default with zero outgoing network traffic.
+- **Tree-Shaking Isolation:** Simulated data generators in `frontend/src/simulation/` are guarded behind compile-time `import.meta.env.VITE_ENABLE_SIMULATION`. In standard production builds, all simulation code and markers are stripped out by Vite/Rollup.
+
+---
+
+## 8. Frontend Architecture & State Management (Phase 1)
+
+### 8.1 State Architecture (Zustand Stores)
+The client UI relies on lightweight, decoupled Zustand stores located in `frontend/src/store/`:
+- **`connectionStore`**: Finite state machine governing connection states (`DISCONNECTED`, `CONNECTING`, `CONNECTED`, `RECONNECTING`, `ERROR`). Implements pure transition guards (`canTransition()`), latency tracking, reconnect counter, and last-seen timestamps.
+- **`settingsStore`**: Persistent operator preferences via `localStorage`:
+  - Target Robot IP / Hostname (default `192.168.1.100`), Backend Port (`8000`), Rosbridge Port (`9090`), Camera Port (`8080`)
+  - Theme mode (`dark`, `light`, `system`)
+  - Control settings: Inverted steering, dead-man switch requirement, max speed cap (0.1 to 1.0), steering sensitivity (0.1 to 2.0), gamepad index
+  - Safety limits: Max linear velocity (0.1 to 1.5 m/s), max angular velocity (0.2 to 3.0 rad/s), obstacle stop distance (0.1 to 1.0 m)
+- **`uiStore`**: Navigation shell states, desktop sidebar collapse toggle, and mobile "More" drawer sheet toggle.
+- **`eventLogStore`**: High-performance 200-item in-memory ring buffer recording timestamped safety triggers, navigation goals, setting updates, and system events.
+
+### 8.2 Client Service Layer
+- **`robotClient`**: Contract defining `connect()`, `disconnect()`, `sendVelocity()`, `emergencyStop()`, `getTelemetry()`, and telemetry subscription listener.
+- **`NotConnectedClient`**: Default production client in Phase 1. Performs zero outbound network calls, emits no fake values, and safely drops control frames without throwing errors.
+- **`MockRobotClient`**: Isolated development harness enabled only when `VITE_ENABLE_SIMULATION === 'true'`. Emits clearly stamped synthetic telemetry and marks `isSimulated: true`.
+
+### 8.3 Mobile & Responsive Ergonomics
+- Responsive breakpoints: Mobile (`< 768px`) utilizes an accessible top header and a fixed 5-item bottom tab bar (`Dashboard`, `Control`, `Camera`, `Nav/Map`, `More`); Tablet/Desktop (`>= 768px`) displays a collapsible left sidebar with full navigation.
+- Touch ergonomics: 44×44px minimum touch targets, hardware-accelerated High-DPI canvas (`PanZoomCanvas`, `LidarCanvas`), zero-dependency virtual touch joystick with pointer capture and automatic zeroing on window blur, pointer cancel, or touch release.
+- Persistent Emergency Stop: Sticky E-STOP button mounted in the application header across all viewports.
+
