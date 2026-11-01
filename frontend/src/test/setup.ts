@@ -24,3 +24,34 @@ Object.defineProperty(window, 'matchMedia', {
     dispatchEvent: () => false,
   }),
 })
+
+// Mock HTMLCanvasElement.prototype.getContext for JSDOM
+if (typeof HTMLCanvasElement !== 'undefined') {
+  HTMLCanvasElement.prototype.getContext = (() => ({
+    fillRect: () => {},
+    clearRect: () => {},
+    getImageData: () => ({ data: new Uint8ClampedArray(4) }),
+    putImageData: () => {},
+    createImageData: () => [],
+    setTransform: () => {},
+    drawImage: () => {},
+    save: () => {},
+    fillText: () => {},
+    restore: () => {},
+    beginPath: () => {},
+    moveTo: () => {},
+    lineTo: () => {},
+    closePath: () => {},
+    stroke: () => {},
+    fill: () => {},
+    arc: () => {},
+    translate: () => {},
+    scale: () => {},
+    rotate: () => {},
+    measureText: () => ({ width: 0 }),
+    transform: () => {},
+    resetTransform: () => {},
+    canvas: { width: 300, height: 150 },
+  })) as unknown as typeof HTMLCanvasElement.prototype.getContext
+}
+
