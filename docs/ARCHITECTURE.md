@@ -70,19 +70,36 @@ flowchart TD
 
 ---
 
-## 3. Communication Protocols and Data Flow
+## 3. Communication Protocols and Data Flow (Two-Link Architecture)
 
-1. **Standard Operations (REST API):**
-   - Transports CRUD operations, system configurations, map management, historical queries, and service triggers over HTTP/1.1 (`/api/*`).
-   - Clean separation of concerns with standard HTTP response codes and typed JSON payloads.
+JetRacer Control Center employs a decoupled **Two-Link Architecture** to ensure robust operations even when backend components are offline:
 
-2. **Real-time Subsystem Telemetry (WebSockets):**
-   - Direct duplex WebSockets (`/ws/*`) for high-frequency internal telemetry (e.g. CPU/GPU thermals, motor feedback) without polling overhead.
+```mermaid
+flowchart LR
+    Client["Operator Client\n(Browser / Capacitor APK)"]
+    
+    subgraph JetsonHost["Jetson Robot Environment"]
+        LinkA["Link A: Rosbridge Server\n(Port 9090 ws://)"]
+        LinkB["Link B: FastAPI Backend\n(Port 8000 http://)"]
+        ROS["ROS Master & Nodes\n(Melodic / Python 2.7 & 3.6)"]
+    end
+    
+    Client -->|Link A: Mandatory for Robot State| LinkA
+    Client -.->|Link B: Optional Auxiliary Services| LinkB
+    LinkA <--> ROS
+    LinkB -.-> ROS
+```
 
-3. **Robotics Protocol (`rosbridge_suite`):**
-   - The browser and Capacitor client connect directly or via backend proxy to `rosbridge_server` (standard port `9090`) using `roslibjs`.
-   - Used for streaming ROS standard topics (`sensor_msgs/LaserScan`, `geometry_msgs/Twist`, `nav_msgs/OccupancyGrid`, `nav_msgs/Odometry`).
-   - Rosbridge protocol specifications and actual topic mappings remain marked as **NOT YET INSPECTED** until Phase 4.
+1. **Link A: Rosbridge WebSocket (`ws://<robot-ip>:9090`) [Mandatory for Robot Connection]**
+   - Direct connection from `roslibjs` in the frontend client to `rosbridge_server` running on the Jetson.
+   - Responsible for all low-latency ROS messaging (odometry, LiDAR scans, camera compressed frames, telemetry, and future velocity commands).
+   - In Phase 3, Link A is **strictly read-only** (only `/rosapi/get_time` service is permitted as a connection heartbeat check). No topics are advertised or published.
+   - If Link A is connected, the UI reports **"Connected to Robot"** even if Link B is unreachable.
+
+2. **Link B: FastAPI Backend (`http://<ip>:8000`) [Optional Auxiliary Services]**
+   - Provides REST endpoints (`/api/v1/*`) and WebSockets (`/ws/telemetry`) for application-level persistence, map catalog storage, and historical logs.
+   - **Independent Availability:** Because the Jetson runs Ubuntu 18.04 with Python 3.6 (and the FastAPI backend requires Python 3.10+), the backend may NOT be installed on the Jetson during initial testing.
+   - The frontend treats Link B as **optional**. If Link B is unreachable, the UI clearly displays "Backend: unreachable / not deployed" as an informational status without failing Link A or blocking robot monitoring.
 
 ---
 

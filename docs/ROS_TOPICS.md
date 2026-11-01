@@ -90,3 +90,21 @@ find ~/ -name "*.launch" 2>/dev/null
 | Address | `0.0.0.0` | *NOT YET INSPECTED* | ❌ No |
 | Protocol | WebSocket (`ws://`) | *NOT YET INSPECTED* | ❌ No |
 | Max Message Size | Default | *NOT YET INSPECTED* | ❌ No |
+
+---
+
+## 8. Operator-Reported, Unverified Topics (Handoff Reference Only)
+
+> ⚠️ **UNVERIFIED NOTICE:** The topics below are referenced in vendor launch files (`jetracer.launch`, `run_jetracer.sh`, `joy_teleop.py`) from operator handoff notes (`docs/ROBOT_STATE.md`). They have **NOT** been inspected on the physical robot and must NOT be used for automated assumptions or commands until Phase 4 live verification.
+
+| Topic Name | Expected Type | Direction | Operator Reported Notes | Verified on Robot |
+| :--- | :--- | :--- | :--- | :---: |
+| `/cmd_vel` | `geometry_msgs/Twist` | Bidirectional / Jetson In | Motor & steering velocity commands. **CAUTION:** `joy_teleop.py` reported to publish zero-twist continuously at 20 Hz when joystick is connected! | ❌ No |
+| `/imu` | `sensor_msgs/Imu` | Robot Out | Chassis IMU angular velocity and linear acceleration. | ❌ No |
+| `/odom` | `nav_msgs/Odometry` | Robot Out | Primary wheel odometry. | ❌ No |
+| `/odom_combined` | `geometry_msgs/PoseWithCovarianceStamped` | Robot Out | Filtered odometry (robot_pose_ekf). | ❌ No |
+| `/odom_raw` | `nav_msgs/Odometry` | Robot Out | Raw uncalibrated wheel odometry. | ❌ No |
+| `/tf` | `tf2_msgs/TFMessage` | Robot Out | Coordinate transformation tree (`odom` -> `base_footprint` -> `base_link` -> `laser_frame`). | ❌ No |
+| `/joy` | `sensor_msgs/Joy` | Controller In | Input state from TGZ wireless 2.4GHz controller. | ❌ No |
+| `/scan` | `sensor_msgs/LaserScan` | Robot Out | 2D LiDAR range scan from RPLIDAR A1. | ❌ No |
+
