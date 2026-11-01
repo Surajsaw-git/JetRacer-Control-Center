@@ -151,10 +151,16 @@
 - **Input Channels:** Multi-touch pointer events, keyboard bindings (WASD / Arrows), and HTML5 Gamepad API polling for USB/Bluetooth gamepads.
 - **Safety Features:** Normalized output (-1.0 to 1.0), dead-man switch toggle, command timeout warning, and persistent "Control Preview Only" banner.
 
-### 7. Robot System Management (`/system`)
+### 7. Robot System Management & ROS Introspection (`/system`)
+- **ROS 1 Introspection Tabs:**
+  - `Status`: ROS master status badge (`OK`, `Degraded`, `Rosbridge Only`, `Master Unreachable`), clock offset gauge with plain-language explanation, rosapi ping latency, and Redacted ROS Inspection Report modal export.
+  - `Topics`: Filterable table of discovered topics and types, publisher/subscriber inspector, "Watch" topic action, and manual fallback entry.
+  - `Nodes`: Registered ROS nodes list with baseline diff and on-demand details inspector.
+  - `Services`: Registered services list with capability policy tags ("Allowed Read-Only" vs "Blocked Policy").
+  - `Watch`: Controlled Topic Watcher (up to 5 concurrent watches), rate throttle selector (100ms-1000ms), LaserScan summary reduction, defensive decoding (NaN/Infinity guards), and sliding-window Hz indicator.
+  - `Registry`: Typed role mapping table (10 subsystems: cmd_vel, odom, imu, scan, map, camera, joy, tf, tf_static, battery), message-type suggestions, live verification status, and JSON profile import/export.
 - **Resource Gauges:** Reusable radial/bar `Gauge` components for CPU utilization, GPU load, RAM usage, Disk space, and Thermal zones.
-- **ROS Process List:** Table of expected ROS nodes with state indicators.
-- **System Power Actions:** `Restart Robot Service`, `Reboot Jetson`, and `Shutdown Robot`. All destructive actions protected by `ConfirmDialog` requiring explicit typed confirmation (e.g. typing "SHUTDOWN").
+- **System Power Actions:** `Restart Robot Service`, `Reboot Jetson`, and `Shutdown Robot` protected by `ConfirmDialog`.
 
 ### 8. Settings & Network Configuration (`/settings`)
 - **Tabs:** `Connection`, `Appearance`, `Control Preferences`, `Safety Limits`, `About`.

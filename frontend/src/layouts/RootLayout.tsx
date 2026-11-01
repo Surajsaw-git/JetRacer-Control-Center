@@ -14,6 +14,7 @@ import {
   MoreHorizontal,
 } from 'lucide-react'
 import { ConnectionChip } from '@/components/common/ConnectionChip'
+import { RosHeaderIndicator } from '@/components/common/RosHeaderIndicator'
 import { EmergencyStopButton } from '@/components/common/EmergencyStopButton'
 import { ThemeToggle } from '@/components/common/ThemeToggle'
 import { SimulationBanner } from '@/components/common/SimulationBanner'
@@ -145,8 +146,9 @@ export function RootLayout() {
               </h2>
             </div>
 
-            {/* Persistent Controls: Connection Chip, Theme Toggle, Emergency Stop */}
+            {/* Persistent Controls: Connection Chip, ROS Indicator, Theme Toggle, Emergency Stop */}
             <div className="flex items-center gap-2 sm:gap-3">
+              <RosHeaderIndicator />
               <ConnectionChip />
               <ThemeToggle />
               <EmergencyStopButton />

@@ -8,7 +8,13 @@
 import type { Ros } from 'roslib'
 import { useConnectionStore } from '@/store/connectionStore'
 import { useSettingsStore } from '@/store/settingsStore'
+import { useRosStatusStore } from '@/store/rosStatusStore'
 import { buildBackendUrl, buildRosbridgeUrl } from '@/utils/validators'
+import {
+  ALLOWED_ROSAPI_SERVICES,
+  assertOperationAllowed,
+  assertServiceAllowed,
+} from '@/services/rosPolicy'
 import type { ConnectionStatus, RosTimestamp } from '@/types'
 
 /**
@@ -24,11 +30,11 @@ export function getRoslib(): Promise<typeof import('roslib')> {
 }
 
 /**
- * Strict allow-list of services permitted in Phase 3.
- * READ-ONLY ENFORCEMENT: No publishing, no topic advertisements, and no unapproved service calls.
+ * Strict allow-list of services permitted in Phase 4.
+ * Backwards compatible export mapping to approved rosapi introspection services.
  */
-export const ALLOWED_SERVICES = ['/rosapi/get_time'] as const
-export type AllowedService = (typeof ALLOWED_SERVICES)[number]
+export const ALLOWED_SERVICES = Object.keys(ALLOWED_ROSAPI_SERVICES)
+export type AllowedService = keyof typeof ALLOWED_ROSAPI_SERVICES
 
 export interface RosbridgeClientOptions {
   connectTimeoutMs?: number
@@ -311,17 +317,20 @@ export class RosbridgeClient {
               : null
 
             useConnectionStore.getState().setHeartbeat(latency, rosTime)
+            useRosStatusStore.getState().updateHeartbeat(latency, rosTime)
             resolve(true)
           },
           (_err: unknown) => {
             if (isTimedOut) return
             clearTimeout(timeout)
+            useRosStatusStore.getState().recordHeartbeatFailure('Failed to query /rosapi/get_time')
             resolve(false)
           },
         )
       } catch {
         if (!isTimedOut) {
           clearTimeout(timeout)
+          useRosStatusStore.getState().recordHeartbeatFailure('Exception during /rosapi/get_time')
           resolve(false)
         }
       }
@@ -442,41 +451,33 @@ export class RosbridgeClient {
   }
 
   /**
-   * Strict Read-Only Guard.
+   * Strict Read-Only Guard delegating to centralized Capability Policy.
    * Throws Error unconditionally across all environments (dev, test, and production).
    * Forbidden operations are never transmitted over the socket.
    */
-  private assertReadOnlyAllowed(operation: string, target?: string): void {
-    const isAllowedService =
-      operation === 'call_service' &&
-      target &&
-      (ALLOWED_SERVICES as readonly string[]).includes(target)
-
-    if (isAllowedService) {
-      return
-    }
-
-    const violationMessage = `[SECURITY VIOLATION] RosbridgeClient is strictly read-only. Attempted operation "${operation}" on "${target || 'unspecified'}" is prohibited.`
-
-    throw new Error(violationMessage)
+  private assertReadOnlyAllowed(
+    operation: 'publish' | 'advertise' | 'subscribe' | 'call_service',
+    target?: string,
+  ): void {
+    assertOperationAllowed(operation, target)
   }
 
   /**
    * Protected Service Caller with Allow-List Enforcement.
    */
-  public callService(
+  public callService<T = unknown>(
     serviceName: string,
     serviceType: string,
     requestPayload: Record<string, unknown> = {},
-  ): Promise<unknown> {
-    this.assertReadOnlyAllowed('call_service', serviceName)
+  ): Promise<T> {
+    assertServiceAllowed(serviceName)
 
     if (!this.ros || !this.ros.isConnected) {
       return Promise.reject(new Error('Rosbridge socket is not connected.'))
     }
 
     return getRoslib().then(({ Service }) => {
-      return new Promise((resolve, reject) => {
+      return new Promise<T>((resolve, reject) => {
         const srv = new Service({
           ros: this.ros!,
           name: serviceName,
@@ -485,7 +486,7 @@ export class RosbridgeClient {
 
         srv.callService(
           requestPayload,
-          (res: unknown) => resolve(res),
+          (res: unknown) => resolve(res as T),
           (err: unknown) => reject(new Error(String(err))),
         )
       })
@@ -493,7 +494,50 @@ export class RosbridgeClient {
   }
 
   /**
-   * Explicitly forbidden ROS operations in Phase 3.
+   * Controlled Subscription Manager hook for read-only telemetry topics.
+   * Rates are throttled and heavy types are guarded before subscription.
+   */
+  public async subscribeToTopic(
+    topicName: string,
+    messageType: string,
+    callback: (message: unknown) => void,
+    throttleRateMs: number = 200,
+  ): Promise<() => void> {
+    this.assertReadOnlyAllowed('subscribe', topicName)
+
+    if (!this.ros || !this.ros.isConnected) {
+      throw new Error('Rosbridge socket is not connected.')
+    }
+
+    const { Topic } = await getRoslib()
+    const topic = new Topic({
+      ros: this.ros,
+      name: topicName,
+      messageType,
+      throttle_rate: throttleRateMs,
+    })
+
+    topic.subscribe(callback)
+
+    return () => {
+      try {
+        topic.unsubscribe(callback)
+      } catch {
+        // Safe teardown
+      }
+    }
+  }
+
+  public getRosInstance(): Ros | null {
+    return this.ros
+  }
+
+  public isConnected(): boolean {
+    return Boolean(this.ros && this.ros.isConnected && this.status === 'connected')
+  }
+
+  /**
+   * Explicitly forbidden ROS publishing and advertising operations.
    */
   public publish(topic: string, _message: unknown): void {
     this.assertReadOnlyAllowed('publish', topic)
@@ -523,9 +567,11 @@ export class RosbridgeClient {
         break
       case 'disconnected':
         store.setDisconnected(message)
+        useRosStatusStore.getState().reset()
         break
       case 'error':
         store.setError(message || 'Unknown connection error')
+        useRosStatusStore.getState().setStatus('master_unreachable', message)
         break
     }
   }

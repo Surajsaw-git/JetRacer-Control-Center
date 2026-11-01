@@ -93,7 +93,47 @@ find ~/ -name "*.launch" 2>/dev/null
 
 ---
 
-## 8. Operator-Reported, Unverified Topics (Handoff Reference Only)
+## 9. Phase 4 ROS Capability Policy & Security Boundaries
+
+In Phase 4, the application connects to rosbridge v2 strictly read-only. No velocity commands are published, and no parameters or state-altering services are invoked.
+
+### 9.1 Approved Read-Only Introspection Services
+Only the following rosapi services are permitted:
+| Service Name | Service Type | Role / Capability |
+| :--- | :--- | :--- |
+| `/rosapi/get_time` | `rosapi/GetTime` | Clock offset and master latency heartbeat |
+| `/rosapi/topics` | `rosapi/Topics` | Discovered topic names |
+| `/rosapi/topic_type` | `rosapi/TopicType` | Individual topic message type lookup |
+| `/rosapi/topics_and_raw_types` | `rosapi/TopicsAndRawTypes` | Batch topic and message type query |
+| `/rosapi/nodes` | `rosapi/Nodes` | Active node list registered on master |
+| `/rosapi/node_details` | `rosapi/NodeDetails` | On-demand node publications & subscriptions |
+| `/rosapi/services` | `rosapi/Services` | Registered ROS services list |
+| `/rosapi/service_type` | `rosapi/ServiceType` | Service type introspection |
+| `/rosapi/publishers` | `rosapi/Publishers` | On-demand publishers for a topic |
+| `/rosapi/subscribers` | `rosapi/Subscribers` | On-demand subscribers for a topic |
+| `/rosapi/message_details` | `rosapi/MessageDetails` | Message type field definitions |
+
+### 9.2 Blocked Operations & Services
+- **Publishing:** Prohibited across all topics (including `/cmd_vel`).
+- **Advertising:** Prohibited across all topics.
+- **Parameter Modification:** `/rosapi/set_param`, `/rosapi/delete_param`, `/rosapi/get_param` are strictly blocked.
+- **State Alteration:** Any service matching `/(set|delete|shutdown|kill|reboot|restart|launch|spawn)/i` is rejected before transmission.
+
+### 9.3 Topic Registry Roles & Type Contracts
+Downstream UI phases consume user-confirmed topic mappings rather than hard-coded topic strings:
+| Application Role | Expected ROS Types | Consumer Subsystem |
+| :--- | :--- | :--- |
+| `cmd_vel` | `geometry_msgs/Twist` | Virtual Joystick & Gamepad (Phase 8) |
+| `odometry` | `nav_msgs/Odometry` | Odometry telemetry & speed gauges (Phase 8) |
+| `imu` | `sensor_msgs/Imu` | IMU orientation & acceleration (Phase 8) |
+| `laser_scan` | `sensor_msgs/LaserScan` | 2D LiDAR radar canvas (Phase 6) |
+| `occupancy_map` | `nav_msgs/OccupancyGrid` | SLAM mapping viewport (Phase 7) |
+| `camera_image` | `sensor_msgs/Image`, `sensor_msgs/CompressedImage` | CSI camera feed (Phase 5 via web_video_server) |
+| `joystick` | `sensor_msgs/Joy` | Hardware gamepad telemetry |
+| `tf` | `tf2_msgs/TFMessage` | Dynamic frame transforms |
+| `tf_static` | `tf2_msgs/TFMessage` | Fixed chassis transforms |
+| `battery` | `sensor_msgs/BatteryState` | Power monitor & voltage gauge |
+
 
 > ⚠️ **UNVERIFIED NOTICE:** The topics below are referenced in vendor launch files (`jetracer.launch`, `run_jetracer.sh`, `joy_teleop.py`) from operator handoff notes (`docs/ROBOT_STATE.md`). They have **NOT** been inspected on the physical robot and must NOT be used for automated assumptions or commands until Phase 4 live verification.
 

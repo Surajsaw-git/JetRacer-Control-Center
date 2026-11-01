@@ -19,8 +19,8 @@
 | **0** | **Project Setup & Architecture** | Repository scaffolding, multi-platform structure, initial FastAPI backend, Vite+React+Tailwind frontend, Capacitor Android shell, test gates, and architecture docs. | **Done** |
 | **1** | **Frontend UI/UX** | Comprehensive dark-first robotics UI, responsive navigation (mobile bottom tabs / desktop sidebar), persistent E-Stop, touch joystick, 9 console modules, canvas visualizers, theme toggle, Zustand stores, unit tests, and isolated simulation mode. | **Done (UI only, not connected to robot, not hardware-tested)** |
 | **2** | **Backend Foundation** | FastAPI app factory, liveness/readiness probes, system metadata, sanitised config, multiplexed WebSocket manager with backpressure & rooms, uniform error envelopes, request-ID tracing, and 91% test coverage. | **Done (Backend skeleton, tested on dev machine only, not hardware-tested)** |
-| **3** | **IP Connection** | Dynamic robot IP discovery, ping latency monitoring, connection state machine, and connection persistence. | Not started |
-| **4** | **ROS Integration** | Live on-robot topic inspection, `rosbridge_suite` client, roslibjs bindings, and parameter service queries. | Not started |
+| **3** | **IP Connection** | Two-link connection architecture (Link A rosbridge + Link B FastAPI), connection wizard with address parser/validator, exponential backoff with jitter, field testing runbook, and mock rosbridge. | **Done (Tested against local mock only, not tested on robot)** |
+| **4** | **ROS Integration** | ROS Master status detection with clock offset, rosapi discovery service with concurrency limit, controlled topic watcher (max 5 watches, heavy-type blocking, LaserScan reduction), user-confirmed topic registry, capability policy, and redacted inspection report export. | **Done (Tested against local mock rosbridge; not tested on robot)** |
 | **5** | **Camera** | Real-time video stream player (MJPEG/WebRTC), snapshot capture, frame rate scaling, and camera settings. | Not started |
 | **6** | **LiDAR** | 2D LaserScan visualization, radial distance grids, collision zone alerts, and point filter settings. | Not started |
 | **7** | **Mapping** | Real-time SLAM occupancy grid streaming, SLAM node launch control, and `.yaml`/`.pgm` map file manager. | Not started |
@@ -217,7 +217,30 @@
 
 ---
 
-## 7. Reusable Progress Report Template (Copy after each phase)
+## 7. Phase 4 Progress Report (ROS Integration & Introspection)
+
+- **Date Completed:** 2026-11-02
+- **Status:** **Done (Tested against extended local mock rosbridge v2; not tested on physical robot)**
+- **What Was Created / Modified:**
+  - **ROS Capability Policy (`services/rosPolicy.ts`):** Strict allow-list of 11 approved read-only rosapi services (`/rosapi/get_time`, `/rosapi/topics`, `/rosapi/topic_type`, `/rosapi/topics_and_raw_types`, `/rosapi/nodes`, `/rosapi/node_details`, `/rosapi/services`, `/rosapi/service_type`, `/rosapi/publishers`, `/rosapi/subscribers`, `/rosapi/message_details`). Deny regex strictly rejecting any parameter manipulation (`set_param`, `delete_param`, `get_param`) or destructive services (`shutdown`, `kill`, `reboot`, `restart`, `launch`, `spawn`). Static and wire-level security verification tests (`rosPolicySecurity.test.ts`).
+  - **Runtime ROS Master Status Detection (`services/rosStatusService.ts`, `store/rosStatusStore.ts`):** Live status (`ok`, `degraded`, `rosbridge_only`, `master_unreachable`, `disconnected`) with flapping protection / hysteresis. Clock offset calculation comparing robot ROS clock with browser clock with plain-language explanations.
+  - **ROS Discovery Service (`services/rosDiscoveryService.ts`, `store/rosDiscoveryStore.ts`):** Concurrency-bounded introspection (max 4 concurrent requests), state diff tracking (highlighting new/removed topics and nodes), on-demand publisher/subscriber lookup, auto-refresh intervals with document visibility pausing, and manual topic fallback.
+  - **Controlled Topic Watcher (`services/subscriptionManager.ts`, `store/subscriptionStore.ts`):** On-demand user-initiated topic subscription (max 5 watches), customizable rate throttling (default 200ms), heavy-type blocking (`sensor_msgs/Image`, `sensor_msgs/CompressedImage`, `sensor_msgs/PointCloud`, `sensor_msgs/PointCloud2`, `nav_msgs/OccupancyGrid`), LaserScan summary reduction (ranges array replaced with min/max/mean stats), defensive value decoding (NaN/Infinity safety), and sliding-window measured Hz.
+  - **User-Confirmed Topic Registry (`services/topicRegistry.ts`, `store/topicRegistryStore.ts`):** 10 typed application roles (`cmd_vel`, `odometry`, `imu`, `laser_scan`, `occupancy_map`, `camera_image`, `joystick`, `tf`, `tf_static`, `battery`). Topic suggestions strictly filtered by expected ROS message types. Verification state machine (`unmapped`, `mapped_unverified`, `verified_live`, `stale`, `missing`) requiring real incoming messages. JSON profile export and versioned schema import (`version: 1.0.0`).
+  - **Frontend UI & System Tabs (`pages/System/`):** Complete tabbed interface with `Status`, `Topics`, `Nodes`, `Services`, `Watch` (Topic Inspector), and `Registry`. Redacted ROS Inspection Report modal with IP masking. Compact `RosStatusCard` on Dashboard. Secondary `RosHeaderIndicator` in top application header.
+  - **Extended Mock Rosbridge (`tools/mock-rosbridge/server.js`):** Supports rosapi introspection services, fake computation graph with strictly non-robot mock names (`/mock_world/*`), rate-throttled synthetic telemetry publishers with NaN/Infinity test values, and failure simulation flags (`--refuse`, `--hang`, `--drop`, `--no-rosapi`, `--flood`).
+  - **Documentation & Verification Checklist:** `docs/PHASE4_ROBOT_VERIFICATION.md` field testing checklist, updated `docs/ROS_TOPICS.md`, `docs/API.md`, `docs/ARCHITECTURE.md`, `docs/UI_DESIGN.md`, and 7 verification screenshots captured at 1366x768 and 360x800 in `docs/screenshots/phase4/`.
+- **Verification & Test Results:**
+  - `backend/`: `ruff format --check .` passed, `ruff check .` passed, `mypy app` passed (0 errors in 26 source files), `pytest --cov=app` passed (**48 tests passed, 91% coverage**).
+  - `frontend/`: `npm run typecheck` passed (0 errors), `npm run lint` passed (0 errors), `npm test` passed (**85 tests passed across 19 test suites**), `npm run build` passed (production build in 746ms; `roslib` lazy-loaded into independent 248 kB chunk).
+  - Android: `npm run cap:sync` passed.
+  - Shell scripts: `bash -n` passed on all 4 scripts in `robot/scripts/`.
+- **Hardware Verification:**
+  - **NOT HARDWARE TESTED.** Verified solely against extended local mock rosbridge server and automated Vitest/Pytest suites. Physical robot testing scheduled at college.
+
+---
+
+## 8. Reusable Progress Report Template (Copy after each phase)
 
 ```markdown
 ### Phase X Progress Report: [Phase Title]

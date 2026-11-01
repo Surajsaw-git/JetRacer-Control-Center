@@ -1,6 +1,6 @@
 # JetRacer Control Center — Architecture Specification
 
-> **STATUS:** Phase 0 Architecture Blueprint. All hardware integrations, telemetry streams, ROS communications, and security policies are planned and NOT yet hardware-tested or inspected on the physical robot.
+> **STATUS:** Phase 4 ROS Integration Blueprint. Phase 0 foundation, Phase 1 UI/UX, Phase 2 Backend foundation, Phase 3 IP Connection, and Phase 4 ROS Introspection (Discovery, Watcher, Topic Registry, and Capability Policy) are completed and tested against local mock rosbridge. Primary robot hardware tables remain marked "NOT YET INSPECTED" until field testing.
 
 ---
 

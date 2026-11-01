@@ -5,18 +5,29 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
 import {
-  Cpu,
   RotateCw,
   Power,
   RotateCcw,
   Activity,
+  Radio,
   Layers,
+  Server,
+  Eye,
+  BookmarkCheck,
 } from 'lucide-react'
 import { isSimulationEnabled, mockSimulatedMetrics } from '@/simulation'
+import { RosStatusTab } from './RosStatusTab'
+import { RosTopicsTab } from './RosTopicsTab'
+import { RosNodesTab } from './RosNodesTab'
+import { RosServicesTab } from './RosServicesTab'
+import { RosWatchTab } from './RosWatchTab'
+import { RosRegistryTab } from './RosRegistryTab'
 
 export function SystemPage() {
+  const [activeTab, setActiveTab] = useState('status')
   const [isRestartServiceOpen, setIsRestartServiceOpen] = useState(false)
   const [isRebootOpen, setIsRebootOpen] = useState(false)
   const [isShutdownOpen, setIsShutdownOpen] = useState(false)
@@ -25,7 +36,7 @@ export function SystemPage() {
   const metrics = isSimulationEnabled ? mockSimulatedMetrics : null
 
   const handleActionToast = (action: string) => {
-    toast.info(`${action} is disabled in Phase 1`, {
+    toast.info(`${action} is disabled in Phase 4`, {
       description: 'Host system management and systemd integration arrives in Phase 10.',
     })
   }
@@ -33,9 +44,9 @@ export function SystemPage() {
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
       <PageHeader
-        title="Robot System Management"
-        description="Jetson hardware telemetry, Tegrastats/jtop resource monitoring, and service supervisor"
-        phase="10 Integration"
+        title="ROS 1 & System Management"
+        description="ROS master introspection, topic discovery, watch telemetry, registry mapping, and host monitor"
+        phase="4 ROS Integration"
         actions={
           <div className="flex items-center gap-2">
             <Button
@@ -69,20 +80,74 @@ export function SystemPage() {
         }
       />
 
-      {/* 1. Hardware Resource Utilization Gauges */}
+      {/* Main ROS 1 Introspection Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-6">
+        <TabsList className="grid grid-cols-3 sm:grid-cols-6 w-full h-auto p-1 bg-muted/60">
+          <TabsTrigger value="status" className="text-xs py-2 flex items-center gap-1.5">
+            <Activity className="h-3.5 w-3.5" />
+            Status
+          </TabsTrigger>
+          <TabsTrigger value="topics" className="text-xs py-2 flex items-center gap-1.5">
+            <Radio className="h-3.5 w-3.5" />
+            Topics
+          </TabsTrigger>
+          <TabsTrigger value="nodes" className="text-xs py-2 flex items-center gap-1.5">
+            <Layers className="h-3.5 w-3.5" />
+            Nodes
+          </TabsTrigger>
+          <TabsTrigger value="services" className="text-xs py-2 flex items-center gap-1.5">
+            <Server className="h-3.5 w-3.5" />
+            Services
+          </TabsTrigger>
+          <TabsTrigger value="watch" className="text-xs py-2 flex items-center gap-1.5">
+            <Eye className="h-3.5 w-3.5" />
+            Watch
+          </TabsTrigger>
+          <TabsTrigger value="registry" className="text-xs py-2 flex items-center gap-1.5">
+            <BookmarkCheck className="h-3.5 w-3.5" />
+            Registry
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="status" className="space-y-6">
+          <RosStatusTab />
+        </TabsContent>
+
+        <TabsContent value="topics" className="space-y-6">
+          <RosTopicsTab onSwitchToWatch={() => setActiveTab('watch')} />
+        </TabsContent>
+
+        <TabsContent value="nodes" className="space-y-6">
+          <RosNodesTab />
+        </TabsContent>
+
+        <TabsContent value="services" className="space-y-6">
+          <RosServicesTab />
+        </TabsContent>
+
+        <TabsContent value="watch" className="space-y-6">
+          <RosWatchTab />
+        </TabsContent>
+
+        <TabsContent value="registry" className="space-y-6">
+          <RosRegistryTab />
+        </TabsContent>
+      </Tabs>
+
+      {/* Hardware Resource Utilization Gauges (Phase 10 Foundation) */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold flex items-center justify-between">
             <span className="flex items-center gap-2">
               <Activity className="h-4 w-4 text-primary" />
-              Hardware Load & Thermals
+              Jetson Hardware Load & Thermals
             </span>
             <Badge variant="outline" className="text-xs font-mono">
               {metrics ? 'Simulated Telemetry' : 'Offline / No Data'}
             </Badge>
           </CardTitle>
           <CardDescription className="text-xs">
-            CPU, GPU, RAM, storage, and thermal envelope metrics
+            CPU, GPU, RAM, storage, and thermal envelope metrics (FastAPI / jtop)
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -114,69 +179,6 @@ export function SystemPage() {
           </div>
         </CardContent>
       </Card>
-
-      {/* 2. System Hardware and OS Profile */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <Cpu className="h-4 w-4 text-primary" />
-              Jetson Hardware Specifications
-            </CardTitle>
-            <CardDescription className="text-xs">On-board computer configuration</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2.5 text-xs">
-            <div className="flex justify-between py-1 border-b border-border/40">
-              <span className="text-muted-foreground">Board Model</span>
-              <span className="font-mono font-medium">NVIDIA Jetson Nano / NX (Est.)</span>
-            </div>
-            <div className="flex justify-between py-1 border-b border-border/40">
-              <span className="text-muted-foreground">Operating System</span>
-              <span className="font-mono">Ubuntu Linux (aarch64)</span>
-            </div>
-            <div className="flex justify-between py-1 border-b border-border/40">
-              <span className="text-muted-foreground">ROS Distribution</span>
-              <span className="font-mono">Melodic / Noetic (NOT INSPECTED)</span>
-            </div>
-            <div className="flex justify-between py-1 border-b border-border/40">
-              <span className="text-muted-foreground">Python Runtime</span>
-              <span className="font-mono">Python 3.8+ Compatible</span>
-            </div>
-            <div className="flex justify-between py-1">
-              <span className="text-muted-foreground">Uptime</span>
-              <span className="font-mono">
-                {metrics ? `${Math.floor(metrics.uptimeSeconds! / 60)} minutes` : '--'}
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* ROS Nodes Status List */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <Layers className="h-4 w-4 text-primary" />
-                Active ROS 1 Nodes
-              </span>
-              <Badge variant="outline" className="text-xs">
-                NOT YET INSPECTED
-              </Badge>
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Live daemon node status from roscore
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2 text-xs">
-            <div className="p-3 rounded-lg bg-muted/20 border border-dashed border-border text-center text-muted-foreground">
-              <p className="font-medium text-foreground">Nodes Unverified</p>
-              <p className="mt-1">
-                Node status inspection commands will be run on the real robot in Phase 4.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
 
       {/* Confirmation Dialogs for System Actions */}
       <ConfirmDialog
