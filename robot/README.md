@@ -81,10 +81,51 @@ While the robot is running its normal stack (e.g. `run_jetracer.sh` or `jetracer
 
 ---
 
-## 3. Launch Configuration (`robot/launch/jetracer_rosbridge.launch`)
+### Step 5: Check Camera Pipeline (`check_camera.sh`)
+Run this read-only diagnostic to check CSI camera hardware, V4L2 devices, GStreamer plugins (`nvarguscamerasrc`), and whether `gscam` or `web_video_server` are installed:
 
+```bash
+./check_camera.sh
+# Optional hardware test capture (2 seconds):
+./check_camera.sh --probe
+```
+
+---
+
+### Step 6: Install Camera Streaming Stack (`install_camera_stack.sh`)
+If `web_video_server` or `image_transport_plugins` are missing, install them:
+
+```bash
+./install_camera_stack.sh
+```
+- Requires typing `INSTALL` to confirm.
+- Installs `ros-melodic-web-video-server` and `ros-melodic-image-transport-plugins`.
+
+---
+
+### Step 7: Start Web Video Server (`start_camera.sh`)
+Launches `web_video_server` on port 8080 (or custom port):
+
+```bash
+./start_camera.sh
+# Or specify custom port:
+./start_camera.sh 8080
+```
+
+---
+
+## 3. Launch Configurations
+
+### `robot/launch/jetracer_rosbridge.launch`
 This launch file configures the WebSocket bridge:
 - `port`: `9090` (WebSocket)
 - `address`: `0.0.0.0` (accessible from any client device on the local network)
-- `authenticate`: `false` (Phase 3 local connection testing)
+- `authenticate`: `false` (local network connection testing)
 - `unregister_timeout`: `10.0` seconds
+
+### `robot/launch/jetracer_web_video.launch`
+This launch file configures the HTTP MJPEG streaming server:
+- `port`: `8080` (HTTP)
+- `address`: `0.0.0.0`
+- `server_threads`: `2`
+- `ros_threads`: `2`

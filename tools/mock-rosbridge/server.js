@@ -11,6 +11,9 @@
 import wsPkg from '../../frontend/node_modules/ws/index.js';
 const { WebSocketServer } = wsPkg;
 import http from 'http';
+import url from 'url';
+import jpegPkg from '../../frontend/node_modules/jpeg-js/index.js';
+const jpeg = jpegPkg.default || jpegPkg;
 
 const args = process.argv.slice(2);
 const flagRefuse = args.includes('--refuse');
@@ -18,6 +21,9 @@ const flagHang = args.includes('--hang');
 const flagDrop = args.includes('--drop');
 const flagNoRosapi = args.includes('--no-rosapi');
 const flagFlood = args.includes('--flood');
+const flagCameraStall = args.includes('--camera-stall');
+const flagCameraFail = args.includes('--camera-fail');
+const flagCameraCorsBlock = args.includes('--camera-cors-block');
 
 let artificialDelayMs = 0;
 const delayIndex = args.indexOf('--delay');
@@ -26,6 +32,7 @@ if (delayIndex !== -1 && args[delayIndex + 1]) {
 }
 
 const PORT = parseInt(process.env.MOCK_ROSBRIDGE_PORT || '9090', 10);
+const WEB_VIDEO_PORT = parseInt(process.env.MOCK_WEB_VIDEO_PORT || '8080', 10);
 const HOST = process.env.MOCK_ROSBRIDGE_HOST || '127.0.0.1';
 
 // Synthetic Graph Definition (strictly non-robot fake names)
@@ -35,11 +42,37 @@ const MOCK_TOPICS = [
   { name: '/mock_world/imu', type: 'sensor_msgs/Imu' },
   { name: '/mock_world/battery', type: 'sensor_msgs/BatteryState' },
   { name: '/mock_world/camera/image_raw', type: 'sensor_msgs/Image' },
+  { name: '/mock_world/camera/image_raw/compressed', type: 'sensor_msgs/CompressedImage' },
   { name: '/mock_world/cmd_vel', type: 'geometry_msgs/Twist' },
   { name: '/mock_world/tf', type: 'tf2_msgs/TFMessage' },
   { name: '/mock_world/tf_static', type: 'tf2_msgs/TFMessage' },
   { name: '/mock_world/test_nan', type: 'sensor_msgs/Imu' },
 ];
+
+function generateSyntheticJpeg(width = 320, height = 240, tick = 0) {
+  const frameData = Buffer.alloc(width * height * 4);
+  const barX = (tick * 12) % width;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      if (x >= barX && x < barX + 28) {
+        frameData[i] = 16;      // R
+        frameData[i + 1] = 185; // G (emerald accent)
+        frameData[i + 2] = 129; // B
+      } else if (x % 32 === 0 || y % 32 === 0) {
+        frameData[i] = 45;
+        frameData[i + 1] = 55;
+        frameData[i + 2] = 72;
+      } else {
+        frameData[i] = 20;
+        frameData[i + 1] = 24;
+        frameData[i + 2] = 33;
+      }
+      frameData[i + 3] = 255;
+    }
+  }
+  return jpeg.encode({ data: frameData, width, height }, 70).data;
+}
 
 const MOCK_NODES = [
   '/mock_world/base_controller',
@@ -311,6 +344,21 @@ if (flagHang) {
               linear_acceleration: { x: NaN, y: Infinity, z: -Infinity },
               angular_velocity: { x: null, y: 0.0, z: 'test_string' },
             };
+          } else if (topic === '/mock_world/camera/image_raw/compressed') {
+            if (flagCameraStall && tick > 10) {
+              return; // Stall simulation
+            }
+            const now = Date.now();
+            const jpegBuf = generateSyntheticJpeg(320, 240, tick);
+            messageData = {
+              header: {
+                seq: tick,
+                stamp: { secs: Math.floor(now / 1000), nsecs: (now % 1000) * 1000000 },
+                frame_id: 'camera_link',
+              },
+              format: 'jpeg',
+              data: jpegBuf.toString('base64'),
+            };
           } else {
             messageData = { seq: tick, message: 'mock payload' };
           }
@@ -352,5 +400,83 @@ if (flagHang) {
 }
 
 server.listen(PORT, HOST, () => {
-  // Server bound
+  console.log(`[MOCK ROSBRIDGE] Server bound to ws://${HOST}:${PORT}`);
 });
+
+// Mock web_video_server on port 8080
+const videoServer = http.createServer((req, res) => {
+  const parsed = url.parse(req.url, true);
+  const pathname = parsed.pathname;
+
+  if (!flagCameraCorsBlock) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  }
+
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
+  if (flagCameraFail) {
+    res.writeHead(500, { 'Content-Type': 'text/plain' });
+    res.end('Mock Camera Server Error\n');
+    return;
+  }
+
+  if (pathname === '/snapshot') {
+    const jpegBuf = generateSyntheticJpeg(640, 480, 1);
+    res.writeHead(200, {
+      'Content-Type': 'image/jpeg',
+      'Content-Length': jpegBuf.length,
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+    });
+    res.end(jpegBuf);
+    return;
+  }
+
+  if (pathname === '/stream') {
+    const boundary = 'boundarydonotcross';
+    res.writeHead(200, {
+      'Content-Type': `multipart/x-mixed-replace; boundary=--${boundary}`,
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Connection': 'close',
+      'Pragma': 'no-cache',
+    });
+
+    let frameCount = 0;
+    const interval = setInterval(() => {
+      frameCount++;
+      if (flagCameraStall && frameCount > 4) {
+        clearInterval(interval);
+        return; // Stall simulation: stops sending frames without closing socket
+      }
+
+      if (res.writableEnded || res.destroyed) {
+        clearInterval(interval);
+        return;
+      }
+
+      const jpegBuf = generateSyntheticJpeg(640, 480, frameCount);
+      const header = `--${boundary}\r\nContent-Type: image/jpeg\r\nContent-Length: ${jpegBuf.length}\r\n\r\n`;
+      res.write(header);
+      res.write(jpegBuf);
+      res.write('\r\n');
+    }, 50);
+
+    req.on('close', () => {
+      clearInterval(interval);
+    });
+    return;
+  }
+
+  res.writeHead(404, { 'Content-Type': 'text/plain' });
+  res.end('Not Found\n');
+});
+
+videoServer.listen(WEB_VIDEO_PORT, HOST, () => {
+  console.log(`[MOCK WEB_VIDEO_SERVER] Listening on http://${HOST}:${WEB_VIDEO_PORT}`);
+});
+

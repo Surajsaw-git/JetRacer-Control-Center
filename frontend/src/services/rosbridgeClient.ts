@@ -14,6 +14,8 @@ import {
   ALLOWED_ROSAPI_SERVICES,
   assertOperationAllowed,
   assertServiceAllowed,
+  assertCameraCompressedSubscriptionAllowed,
+  MIN_CAMERA_THROTTLE_MS,
 } from '@/services/rosPolicy'
 import type { ConnectionStatus, RosTimestamp } from '@/types'
 
@@ -61,6 +63,7 @@ export class RosbridgeClient {
   private consecutiveFailedHeartbeats: number = 0
   private reconnectAttempts: number = 0
   private isIntentionalDisconnect: boolean = false
+  private activeCameraSubscriptions: number = 0
 
   constructor(options?: RosbridgeClientOptions) {
     this.options = {
@@ -526,6 +529,56 @@ export class RosbridgeClient {
         // Safe teardown
       }
     }
+  }
+
+  /**
+   * Controlled subscription for camera compressed image streams over rosbridge.
+   * Strictly enforces caller identity, throttle floor (>=100ms), and single active subscription.
+   */
+  public async subscribeCameraCompressed(
+    topicName: string,
+    callback: (message: unknown) => void,
+    throttleRateMs: number = MIN_CAMERA_THROTTLE_MS,
+    caller: string = 'RosbridgeCompressedSource',
+  ): Promise<() => void> {
+    assertCameraCompressedSubscriptionAllowed(
+      caller,
+      'sensor_msgs/CompressedImage',
+      throttleRateMs,
+      this.activeCameraSubscriptions,
+    )
+
+    if (!this.ros || !this.ros.isConnected) {
+      throw new Error('Rosbridge socket is not connected.')
+    }
+
+    const { Topic } = await getRoslib()
+    const topic = new Topic({
+      ros: this.ros,
+      name: topicName,
+      messageType: 'sensor_msgs/CompressedImage',
+      throttle_rate: Math.max(MIN_CAMERA_THROTTLE_MS, throttleRateMs),
+      queue_length: 1,
+    })
+
+    this.activeCameraSubscriptions++
+    topic.subscribe(callback)
+
+    let cleanedUp = false
+    return () => {
+      if (cleanedUp) return
+      cleanedUp = true
+      this.activeCameraSubscriptions = Math.max(0, this.activeCameraSubscriptions - 1)
+      try {
+        topic.unsubscribe(callback)
+      } catch {
+        // Safe teardown
+      }
+    }
+  }
+
+  public getActiveCameraSubscriptionsCount(): number {
+    return this.activeCameraSubscriptions
   }
 
   public getRosInstance(): Ros | null {

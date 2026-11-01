@@ -2,16 +2,16 @@
 
 JetRacer Control Center is a comprehensive, multi-platform robotics command and telemetry dashboard designed to control and monitor the NVIDIA JetRacer ROS AI Kit over a local Wi-Fi network. Running simultaneously as a responsive React web application, an installable Android mobile application (via Capacitor), and a desktop browser interface, it eliminates the need for direct SSH terminals or HDMI monitor connections during autonomous navigation, mapping, and driving experiments.
 
-> **PROJECT STATUS (PHASE 4 COMPLETED):**
-> Phase 4 ROS Integration & Topic Introspection is complete:
-> - **Capability Policy & Security Guard:** Strictly read-only operation. Zero velocity commands, zero advertising, zero parameter set/delete. Only 11 verified rosapi introspection services permitted.
-> - **Runtime ROS Master Status:** Heartbeat latency, clock offset calculation vs browser time with plain-language explanation, flapping protection / hysteresis.
-> - **ROS Discovery Service:** Concurrency-limited (max 4 concurrent requests), diff tracking highlighting new/removed topics and nodes, on-demand details inspector, auto-refresh intervals with visibility pausing, and manual topic fallback.
-> - **Controlled Topic Watcher:** On-demand topic inspection (max 5 watches), rate throttling (100ms-1000ms), heavy-type blocking (images, point clouds, occupancy grids), LaserScan summary reduction, defensive decoding (NaN/Infinity safety), and sliding-window measured Hz.
-> - **Topic Registry:** 10 typed application roles (`cmd_vel`, `odometry`, `imu`, `laser_scan`, `occupancy_map`, `camera_image`, `joystick`, `tf`, `tf_static`, `battery`). Topic suggestions filtered by expected types. Verification state machine with versioned JSON export/import schema.
-> - **System Management Interface:** Tabbed System Console (`Status`, `Topics`, `Nodes`, `Services`, `Watch`, `Registry`), Redacted ROS Inspection Report modal export, Dashboard `RosStatusCard`, and secondary Header ROS indicator.
-> - **Robot Runbook:** Complete field checklist in [`docs/PHASE4_ROBOT_VERIFICATION.md`](file:///d:/Project/JetRacer%20Control%20Center/docs/PHASE4_ROBOT_VERIFICATION.md).
-> - **TESTING STATUS:** Tested against extended local mock rosbridge v2 only. **NOT YET TESTED ON PHYSICAL ROBOT.** Real ROS topics remain **NOT YET INSPECTED** until college hardware visit.
+> **PROJECT STATUS (PHASE 5 COMPLETED):**
+> Phase 5 Camera Module is complete:
+> - **Dual Transport Streamer:** Primary HTTP MJPEG streaming via `web_video_server` (Port 8080) with automatic fallback to rosbridge `sensor_msgs/CompressedImage` over WebSocket.
+> - **Evolved Video Viewport:** HTML5 Canvas rendering preserving 16:9 aspect ratio with black letterboxing, toggleable HUD (FPS, resolution, bandwidth, drop counter, latency), and Fullscreen API with Android back button popstate and Screen Wake Lock.
+> - **Camera Manager:** Singleton ref-counting coordinator (`cameraManager`) sharing a single underlying stream across Camera page, Dashboard preview, and Control cockpit. Halts stream when 0 consumers are active.
+> - **Quality Presets & Auto-Adaptation:** Low, Medium, High, Custom, and Auto modes with hysteresis controller (10s dwell time).
+> - **Client-Side Snapshots:** Instant PNG frame download with timestamped naming (`jetracer-snap-<timestamp>.png`).
+> - **Strict Read-Only Enforcement:** Zero publishing, zero parameter writing, raw `sensor_msgs/Image` blocked over WebSocket.
+> - **Robot Runbook:** Diagnostic and installation scripts in `robot/scripts/` (`check_camera.sh`, `install_camera_stack.sh`, `start_camera.sh`) and field verification guide in [`docs/PHASE5_ROBOT_VERIFICATION.md`](file:///d:/Project/JetRacer%20Control%20Center/docs/PHASE5_ROBOT_VERIFICATION.md).
+> - **TESTING STATUS:** Tested against extended local mock rosbridge + mock `web_video_server`. **NOT YET TESTED ON PHYSICAL ROBOT.** Real ROS topics remain **NOT YET INSPECTED** until college hardware visit.
 
 ---
 
@@ -29,7 +29,7 @@ JetRacer Control Center is a comprehensive, multi-platform robotics command and 
 
 - **Dashboard (`/`):** Real-time operational overview, connection status chip, telemetry summary grid (battery, CPU/GPU thermals, memory, network), live sensor previews, and quick actions.
 - **Manual Control (`/control`):** Multi-touch virtual joystick (auto-returns to center on release or window blur), dynamic portrait and landscape cockpit layouts, keyboard driving (WASD / Arrows), HTML5 Gamepad API integration, and speed cap limiters.
-- **Camera Viewport (`/camera`):** 16:9 responsive video frame with fullscreen toggle, FPS/latency HUD overlays, and stream controls (MJPEG/WebRTC streaming arrives in Phase 5).
+- **Camera Viewport (`/camera`):** 16:9 responsive canvas video viewport with black letterboxing, fullscreen toggle with Screen Wake Lock, toggleable HUD overlays (FPS, resolution, bandwidth, latency), client-side snapshots, and multi-transport failover (HTTP MJPEG + WebSocket Compressed).
 - **LiDAR Scanner (`/lidar`):** Hardware-accelerated 2D canvas with polar range rings, 30° radial markers, forward robot marker, interactive touch/mouse pan & zoom, point size/range sliders, and distance color coding.
 - **Mapping & SLAM (`/mapping`):** 2D occupancy grid pan/zoom canvas, SLAM session controls, and saved map file library drawer (`.yaml`/`.pgm`).
 - **Autonomous Navigation (`/navigation`):** 2D Nav Goal, Pose Estimate, and Waypoint sequencer tool modes with prominent safety layer fail-safe notice.

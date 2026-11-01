@@ -173,3 +173,19 @@ cd ~/jetracer-robot/scripts
 | **Robot moves unexpectedly** | Vendor joy node publishing commands or noise. | **Immediately toggle physical battery switch** on robot chassis, or hold Gamepad R1. |
 | **"Mixed content blocked"** | Web app loaded via HTTPS trying to connect to ws://. | Load web app via standard `http://<laptop-ip>:5173`, not `https://`. |
 | **Port 9090 occupied** | Stale rosbridge instance already running. | Run `sudo lsof -i :9090` and terminate the orphaned process (`kill -9 <PID>`). |
+| **Camera video not loading (Port 8080)** | `web_video_server` not running or missing package. | Run `bash robot/scripts/install_camera_stack.sh` then `bash robot/scripts/start_camera.sh 8080`. |
+| **`cannot launch node of type [gscam/gscam]`** | `gscam` package missing on Jetson Nano Melodic. | Run `bash robot/scripts/check_camera.sh` to diagnose and see source compilation steps. |
+
+---
+
+### Step 6: Start Camera Stream for Phase 5
+
+In SSH terminal on the Jetson:
+```bash
+cd ~/jetracer-robot/scripts
+bash check_camera.sh
+bash start_camera.sh 8080
+```
+- Starts `web_video_server` on port 8080.
+- In Control Center UI, navigate to **Camera** and click **Start Stream**.
+- Refer to [Phase 5 Robot Verification](file:///docs/PHASE5_ROBOT_VERIFICATION.md) for complete runbook.

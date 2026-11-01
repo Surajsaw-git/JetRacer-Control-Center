@@ -36,8 +36,11 @@ rostopic info <topic_name>
 # 8. List all installed ROS packages:
 rospack list
 
-# 9. Search for JetRacer workspace launch files:
-find ~/ -name "*.launch" 2>/dev/null
+# 10. Inspect Camera & Streaming Packages (Phase 5):
+rostopic list | grep -E "image|camera|csi"
+rospack find web_video_server
+rospack find gscam
+bash robot/scripts/check_camera.sh
 ```
 
 ---

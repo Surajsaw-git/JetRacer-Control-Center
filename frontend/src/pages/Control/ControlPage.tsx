@@ -276,7 +276,7 @@ export function ControlPage() {
             </Card>
 
             <div className="col-span-2">
-              <VideoViewport aspectRatio="16/9" />
+              <VideoViewport consumerId="control_landscape" aspectRatio="16/9" />
             </div>
 
             <Card className="p-4 flex flex-col items-center justify-center col-span-1">
@@ -298,7 +298,7 @@ export function ControlPage() {
                   <span className="text-xs font-semibold uppercase text-muted-foreground">Driving Viewport</span>
                   <Badge variant="outline" className="text-[10px]">16:9 HD</Badge>
                 </div>
-                <VideoViewport />
+                <VideoViewport consumerId="control_portrait" />
               </Card>
             </div>
 

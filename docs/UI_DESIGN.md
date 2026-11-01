@@ -122,13 +122,20 @@
 +-------------------------------------+-----------------------------+
 ```
 
-### 2. Camera Viewport (`/camera`)
-- **Main Viewport:** 16:9 aspect ratio responsive canvas with dark backdrop.
-- **States:** `No Stream` (default Phase 1), `Loading`, `Streaming`, `Error`.
-- **Overlay HUD:**
-  - Top-left: Latency readout (e.g. `-- ms`) and frame rate (`-- fps`).
-  - Top-right: Fullscreen toggle, aspect ratio selector.
-  - Bottom controls: Snapshot button (disabled), record stream button (disabled), resolution quality dropdown (disabled).
+### 2. Camera Viewport (`/camera`) (Phase 5 Evolved)
+- **Main Viewport:** 16:9 aspect ratio responsive HTML5 canvas with black letterboxing and pixel-perfect rendering.
+- **States:** `Idle` (standby), `Connecting`, `Streaming`, `Stalled` (3s timeout alert), `Reconnecting` (exponential backoff), `Failed` (with diagnosis hints), `No Source`.
+- **Overlay HUD (Toggleable via button or 'H' key):**
+  - Top-left: Live stream badge (`LIVE`), transport badge (`HTTP MJPEG` vs `ROSBRIDGE`), frame rate (`FPS`), native resolution (`WxH`), estimated bandwidth (`kB/s`), dropped frames counter, and clock-adjusted end-to-end latency (`ms`).
+  - Top-right: HUD toggle button, Fullscreen toggle button ('F' key).
+  - Bottom controls: Client-side PNG snapshot capture with timestamped downloads, quality preset indicator.
+  - Fullscreen features: Fullscreen API with CSS fallback, Android back button popstate handling, Screen Wake Lock API, 3-second auto-hide controls overlay.
+- **Controls & Configuration Toolbar:**
+  - Topic Selector with dynamic discovery, base topic grouping, Topic Registry role (`camera_image`) assignment badge, and manual topic fallback.
+  - Transport selector: `web_video_server (HTTP Port 8080)` vs `rosbridge (sensor_msgs/CompressedImage)`.
+  - Quality selector: Low (320x240, 15fps), Medium (640x480, 20fps), High (720p, 30fps), Auto (hysteresis controller).
+  - Explicit Start / Stop stream action button (auto-start toggle strictly defaults to OFF).
+  - On-robot runbook & diagnostic terminal cheat-sheet.
 
 ### 3. LiDAR Radar (`/lidar`)
 - **Interactive `<LidarCanvas>`:** High-DPI canvas supporting pan and zoom via touch drag/pinch and mouse wheel.

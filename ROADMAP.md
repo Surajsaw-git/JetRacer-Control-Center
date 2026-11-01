@@ -21,7 +21,7 @@
 | **2** | **Backend Foundation** | FastAPI app factory, liveness/readiness probes, system metadata, sanitised config, multiplexed WebSocket manager with backpressure & rooms, uniform error envelopes, request-ID tracing, and 91% test coverage. | **Done (Backend skeleton, tested on dev machine only, not hardware-tested)** |
 | **3** | **IP Connection** | Two-link connection architecture (Link A rosbridge + Link B FastAPI), connection wizard with address parser/validator, exponential backoff with jitter, field testing runbook, and mock rosbridge. | **Done (Tested against local mock only, not tested on robot)** |
 | **4** | **ROS Integration** | ROS Master status detection with clock offset, rosapi discovery service with concurrency limit, controlled topic watcher (max 5 watches, heavy-type blocking, LaserScan reduction), user-confirmed topic registry, capability policy, and redacted inspection report export. | **Done (Tested against local mock rosbridge; not tested on robot)** |
-| **5** | **Camera** | Real-time video stream player (MJPEG/WebRTC), snapshot capture, frame rate scaling, and camera settings. | Not started |
+| **5** | **Camera** | Real-time video stream player (HTTP MJPEG + WebSocket Compressed fallback), 16:9 canvas letterbox rendering, ref-counted cameraManager, client-side snapshot capture, quality presets & auto-adaptation, stall detection with backoff, and robot setup runbook. | **Done (Mock-tested only; not tested on robot)** |
 | **6** | **LiDAR** | 2D LaserScan visualization, radial distance grids, collision zone alerts, and point filter settings. | Not started |
 | **7** | **Mapping** | Real-time SLAM occupancy grid streaming, SLAM node launch control, and `.yaml`/`.pgm` map file manager. | Not started |
 | **8** | **Manual Control** | Virtual on-screen joystick, keyboard bindings, speed limiters, steering trim calibration, and dead-man switch. | Not started |
@@ -240,7 +240,54 @@
 
 ---
 
-## 8. Reusable Progress Report Template (Copy after each phase)
+## 8. Phase 5 Progress Report (Camera Module)
+
+- **Date Completed:** 2026-11-02
+- **Status:** **Done (Tested against extended local mock rosbridge + mock web_video_server; not tested on physical robot)**
+- **What Was Created / Modified:**
+  - **Camera Service Layer (`services/camera/`):**
+    - `cameraTypes.ts`: Source types (`web_video_server`, `rosbridge_compressed`, `none`), presets (`low`, `medium`, `high`, `auto`, `custom`), metrics interfaces (`fps`, `width`, `height`, `bandwidthKbps`, `droppedFrames`, `latencyMs`), frame events.
+    - `cameraUrl.ts`: Pure URL builder for `/stream` and `/snapshot` with parameter clamping, query encoding, base topic resolution, and browser mixed-content guard.
+    - `WebVideoServerSource.ts`: Primary HTTP MJPEG streamer on port 8080 with stall detection (3000ms), exponential backoff with jitter (max 8 attempts), and real-time FPS/bandwidth calculations.
+    - `rosbridgeCompressedSource.ts`: Fallback WebSocket transport subscribing to `sensor_msgs/CompressedImage` with latest-frame-wins drop policy, base64 JPEG decode to Blob/ImageBitmap, memory release (`bitmap.close()`), and clock-adjusted latency.
+    - `cameraManager.ts`: Singleton coordinator with consumer ref-counting (`attachConsumer` / `detachConsumer`), auto-quality adaptation loop with hysteresis (10s dwell time), and client-side snapshot capture with timestamped PNG downloads.
+  - **Evolved Video Viewport (`components/common/VideoViewport.tsx`):**
+    - 16:9 aspect ratio preservation with black letterboxing rendered via HTML5 Canvas and `requestAnimationFrame`.
+    - Fullscreen API support with CSS pseudo-fullscreen fallback, Android back button popstate handling, Screen Wake Lock API, and 3-second auto-hide controls overlay.
+    - Toggleable HUD overlay showing LIVE state, transport badge, FPS, resolution, bandwidth, drop counter, and latency.
+    - Multi-view integration across Camera page (`camera_page`), Dashboard (`dashboard_preview`), and Control page (`control_landscape` / `control_portrait`).
+  - **Camera Page UI (`pages/Camera/CameraPage.tsx`):**
+    - Dynamic image topic discovery (`sensor_msgs/Image` and `sensor_msgs/CompressedImage`), base topic grouping, Topic Registry role (`camera_image`) assignment awareness, and manual topic fallback.
+    - Dual transport selector (`web_video_server` vs `rosbridge`), port configuration, quality preset selector, and explicit Start/Stop stream button (autoStart toggle strictly default OFF).
+    - Diagnostic drawer with command runbook for Jetson Nano terminal.
+  - **ROS Capability Policy Update (`services/rosPolicy.ts`):**
+    - Added `assertCameraCompressedSubscriptionAllowed`: enforces that only `RosbridgeCompressedSource` can subscribe to `sensor_msgs/CompressedImage`, throttle $\ge 100\text{ ms}$, max 1 camera subscription over rosbridge.
+    - Generic watcher tab remains blocked from subscribing to camera streams.
+    - Raw uncompressed `sensor_msgs/Image` is strictly prohibited from WebSocket transmission.
+    - Publishing and parameter writes remain strictly denied.
+  - **Robot-Side Scripts (`robot/`):**
+    - `robot/scripts/check_camera.sh`: Read-only camera diagnostic script with `--probe` hardware capture flag.
+    - `robot/scripts/install_camera_stack.sh`: Safe package installer requiring typed `INSTALL` confirmation.
+    - `robot/launch/jetracer_web_video.launch`: Launch file for `web_video_server` on port 8080.
+    - `robot/scripts/start_camera.sh`: Startup wrapper.
+  - **Dev-Only Mock Server (`tools/mock-rosbridge/server.js`):**
+    - Synthetic `sensor_msgs/CompressedImage` publisher using pinned dev dependency `jpeg-js`.
+    - Mock HTTP `web_video_server` on port 8080 providing `/stream` (multipart MJPEG) and `/snapshot` (single JPEG) with CORS headers.
+    - Failure injection flags: `--camera-stall`, `--camera-fail`, `--camera-cors-block`.
+  - **Documentation & Evidence:**
+    - `docs/PHASE5_ROBOT_VERIFICATION.md` runbook.
+    - 7 screenshots captured in `docs/screenshots/phase5/`.
+- **Verification & Test Results:**
+  - `frontend/`: `npm run typecheck` passed (0 errors), `npm run lint` passed (0 errors), `npm test` passed (**104 tests passed across 24 test suites**), `npm run build` passed (bundle built in 763ms).
+  - `backend/`: `pytest` passed (**48 tests passed**), `ruff check backend` passed, `mypy backend` passed (0 errors in 37 source files).
+  - Android: `npx cap sync` passed.
+  - Mock audit: 0 mock strings in `dist/assets/`, `npm audit --omit=dev` 0 vulnerabilities.
+- **Hardware Verification:**
+  - **NOT HARDWARE TESTED.** Verified solely against extended local mock rosbridge + mock web_video_server. Physical robot testing scheduled at college.
+
+---
+
+## 9. Reusable Progress Report Template (Copy after each phase)
 
 ```markdown
 ### Phase X Progress Report: [Phase Title]

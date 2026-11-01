@@ -88,6 +88,24 @@ export const RESTRICTED_SUBSCRIPTION_TYPES: readonly string[] = [
 export const MAX_WATCH_SUBSCRIPTIONS = 5
 
 /**
+ * Maximum concurrent camera topic subscriptions permitted over rosbridge (Phase 5).
+ */
+export const MAX_CAMERA_SUBSCRIPTIONS = 1
+
+/**
+ * Minimum throttle interval (ms) enforced on camera subscriptions over rosbridge (max 10 Hz).
+ */
+export const MIN_CAMERA_THROTTLE_MS = 100
+
+/**
+ * Approved outbound HTTP endpoints for on-robot video streaming (web_video_server).
+ */
+export const ALLOWED_HTTP_VIDEO_ENDPOINTS = [
+  '/stream',
+  '/snapshot',
+] as const
+
+/**
  * Default throttle interval in milliseconds for watched topic streams.
  */
 export const DEFAULT_WATCH_THROTTLE_MS = 200
@@ -164,4 +182,48 @@ export function isHeavyMessageType(messageType: string): boolean {
 export function isRestrictedMessageType(messageType: string): boolean {
   if (!messageType) return false
   return RESTRICTED_SUBSCRIPTION_TYPES.includes(messageType.trim())
+}
+
+/**
+ * Validates that a camera subscription to sensor_msgs/CompressedImage satisfies all safety bounds:
+ * 1. Only invoked by the specialized camera service ('RosbridgeCompressedSource')
+ * 2. Throttle rate >= 100ms (maximum 10 Hz)
+ * 3. Concurrent camera subscriptions over rosbridge strictly <= 1
+ * 4. Raw sensor_msgs/Image is NEVER permitted over rosbridge.
+ */
+export function assertCameraCompressedSubscriptionAllowed(
+  caller: string,
+  messageType: string,
+  throttleRateMs: number,
+  activeCameraSubscriptions: number,
+): void {
+  if (messageType === 'sensor_msgs/Image') {
+    throw new Error(
+      '[SECURITY VIOLATION] Raw uncompressed "sensor_msgs/Image" cannot be streamed over rosbridge JSON. Use web_video_server or compressed image transport.',
+    )
+  }
+
+  if (messageType !== 'sensor_msgs/CompressedImage') {
+    throw new Error(
+      `[SECURITY VIOLATION] Camera rosbridge transport only supports "sensor_msgs/CompressedImage", received "${messageType}".`,
+    )
+  }
+
+  if (caller !== 'RosbridgeCompressedSource') {
+    throw new Error(
+      `[SECURITY VIOLATION] Unauthorized caller "${caller}" attempted camera subscription. Only RosbridgeCompressedSource is permitted.`,
+    )
+  }
+
+  if (throttleRateMs < MIN_CAMERA_THROTTLE_MS) {
+    throw new Error(
+      `[SECURITY VIOLATION] Camera throttle rate ${throttleRateMs}ms is below the minimum safety threshold (${MIN_CAMERA_THROTTLE_MS}ms).`,
+    )
+  }
+
+  if (activeCameraSubscriptions >= MAX_CAMERA_SUBSCRIPTIONS) {
+    throw new Error(
+      `[SECURITY VIOLATION] Maximum active camera subscriptions (${MAX_CAMERA_SUBSCRIPTIONS}) exceeded. Only one camera stream may run concurrently over rosbridge.`,
+    )
+  }
 }

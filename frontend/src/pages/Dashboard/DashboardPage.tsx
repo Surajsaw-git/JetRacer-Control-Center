@@ -177,7 +177,7 @@ export function DashboardPage() {
             </Button>
           </CardHeader>
           <CardContent className="flex-1 flex items-center justify-center p-4">
-            <VideoViewport className="w-full h-full" />
+            <VideoViewport consumerId="dashboard_preview" className="w-full h-full" />
           </CardContent>
         </Card>
 

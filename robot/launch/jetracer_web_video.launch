@@ -1,0 +1,17 @@
+<launch>
+  <!--
+    JetRacer Control Center — Web Video Server Launch File
+    Launches web_video_server on port 8080 to stream ROS camera topics over HTTP MJPEG.
+  -->
+  <arg name="port" default="8080" doc="HTTP server listening port" />
+  <arg name="address" default="0.0.0.0" doc="Binding IP address" />
+  <arg name="server_threads" default="2" doc="Threads for HTTP serving" />
+  <arg name="ros_threads" default="2" doc="Threads for ROS topic subscription" />
+
+  <node name="web_video_server" pkg="web_video_server" type="web_video_server" output="screen" respawn="true">
+    <param name="port" value="$(arg port)" />
+    <param name="address" value="$(arg address)" />
+    <param name="server_threads" value="$(arg server_threads)" />
+    <param name="ros_threads" value="$(arg ros_threads)" />
+  </node>
+</launch>

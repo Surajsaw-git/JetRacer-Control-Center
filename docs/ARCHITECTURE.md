@@ -59,7 +59,7 @@ flowchart TD
 | :--- | :--- | :--- | :--- |
 | **Robot Connection** | `app/api/`, `app/core/` | Phase 3 | Dynamic IP discovery, target reachability ping, persistent host settings, and connection heartbeat. |
 | **ROS Integration** | `app/ros/` | Phase 4 | ROS topic inspection, service proxying, parameter retrieval, and rosbridge WebSocket session lifecycle. |
-| **Camera Streaming** | `app/services/` | Phase 5 | WebRTC/MJPEG camera proxying, frame rate scaling, resolution adjustments, and latency optimization. |
+| **Camera Streaming** | `frontend/src/services/camera/` | Phase 5 (Complete) | Multi-transport camera streaming (`web_video_server` HTTP MJPEG + rosbridge `sensor_msgs/CompressedImage` fallback), consumer ref-counting, auto-quality adaptation, 16:9 canvas letterbox, and snapshots. |
 | **LiDAR Visualization** | `app/services/`, `app/ros/` | Phase 6 | 2D laser scan parsing, point cloud downsampling, obstacle proximity alerts, and polar coordinate rendering. |
 | **Mapping & SLAM** | `app/services/` | Phase 7 | SLAM launch orchestration, occupancy grid map tile streaming, map saving (`.yaml` / `.pgm`), and map listing. |
 | **Manual Control** | `app/safety/`, `app/ros/` | Phase 8 | Virtual joystick control, keyboard bindings, steering trim calibration, and acceleration profiling. |

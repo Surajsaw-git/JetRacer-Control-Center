@@ -375,3 +375,45 @@ Profiles exported and imported via the System Registry tab:
   }
 }
 ```
+
+---
+
+## 6. Camera Streaming Protocol (Phase 5)
+
+### 6.1 `web_video_server` HTTP MJPEG Stream (Primary Transport)
+- **Base URL:** `http://<ROBOT_IP>:8080`
+- **Stream Endpoint:** `GET /stream?topic=<base_topic>&quality=<1-100>&width=<w>&height=<h>&type=mjpeg`
+  - **Content-Type:** `multipart/x-mixed-replace; boundary=--boundarydonotcross`
+  - **Frame Format:** Standard binary JPEG chunks separated by boundary delimiter.
+- **Snapshot Endpoint:** `GET /snapshot?topic=<base_topic>&quality=<1-100>&width=<w>&height=<h>`
+  - **Content-Type:** `image/jpeg`
+  - **Headers:** `Access-Control-Allow-Origin: *`, `Cache-Control: no-cache`
+
+### 6.2 Rosbridge WebSocket Compressed Transport (Fallback Transport)
+- **Subscription Operation:**
+  ```json
+  {
+    "op": "subscribe",
+    "topic": "<topic>/compressed",
+    "type": "sensor_msgs/CompressedImage",
+    "throttle_rate": 100,
+    "queue_length": 1
+  }
+  ```
+- **Incoming Frame Payload:**
+  ```json
+  {
+    "op": "publish",
+    "topic": "/csi_cam_0/image_raw/compressed",
+    "msg": {
+      "header": { "seq": 102, "stamp": { "secs": 1700000000, "nsecs": 500000000 }, "frame_id": "camera_link" },
+      "format": "jpeg",
+      "data": "<base64_encoded_jpeg_string>"
+    }
+  }
+  ```
+- **Safety Enforcement:**
+  - Maximum 1 active camera stream over rosbridge.
+  - Throttle floor $\ge 100\text{ ms}$ (max 10 Hz).
+  - Raw `sensor_msgs/Image` is strictly blocked.
+  - Latest-frame-wins drop policy prevents backpressure.
