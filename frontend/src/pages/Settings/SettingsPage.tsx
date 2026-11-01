@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { PageHeader } from '@/components/common/PageHeader'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
+import { ConnectionWizard } from '@/components/common/ConnectionWizard'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Slider } from '@/components/ui/slider'
@@ -24,31 +24,12 @@ import {
   Shield,
   Info,
   RotateCcw,
-  AlertCircle,
 } from 'lucide-react'
-import { useSettingsStore, defaultSettings } from '@/store/settingsStore'
-import { useEventLogStore } from '@/store/eventLogStore'
-import { isValidHost, isValidPort } from '@/utils/validators'
+import { useSettingsStore } from '@/store/settingsStore'
 import type { AppTheme, Density, Handedness, JoystickSize, UnitSystem } from '@/types'
 
 export function SettingsPage() {
   const settings = useSettingsStore()
-  const addEvent = useEventLogStore((state) => state.addEvent)
-
-  // Local connection form state
-  const [hostInput, setHostInput] = useState(settings.connection.host)
-  const [backendPortInput, setBackendPortInput] = useState(String(settings.connection.backendPort))
-  const [rosbridgePortInput, setRosbridgePortInput] = useState(
-    String(settings.connection.rosbridgePort),
-  )
-  const [useSslInput, setUseSslInput] = useState(settings.connection.useSsl)
-
-  // Field validation errors
-  const [errors, setErrors] = useState<{
-    host?: string
-    backendPort?: string
-    rosbridgePort?: string
-  }>({})
 
   // Reset confirmation dialog
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false)
@@ -56,53 +37,6 @@ export function SettingsPage() {
   // Health check query state for About tab
   const [healthStatus, setHealthStatus] = useState<string | null>(null)
   const [isCheckingHealth, setIsCheckingHealth] = useState(false)
-
-  const handleSaveConnection = (e: React.FormEvent) => {
-    e.preventDefault()
-    const newErrors: typeof errors = {}
-
-    if (hostInput.trim() && !isValidHost(hostInput.trim())) {
-      newErrors.host =
-        'Please enter a valid IPv4 address (e.g. 192.168.1.100) or hostname (e.g. jetson.local)'
-    }
-
-    if (!isValidPort(backendPortInput)) {
-      newErrors.backendPort = 'Port must be an integer between 1 and 65535'
-    }
-
-    if (!isValidPort(rosbridgePortInput)) {
-      newErrors.rosbridgePort = 'Port must be an integer between 1 and 65535'
-    }
-
-    setErrors(newErrors)
-    if (Object.keys(newErrors).length > 0) {
-      toast.error('Invalid connection settings', {
-        description: 'Please correct the highlighted errors before saving.',
-      })
-      return
-    }
-
-    settings.updateConnection({
-      host: hostInput.trim(),
-      backendPort: Number(backendPortInput),
-      rosbridgePort: Number(rosbridgePortInput),
-      useSsl: useSslInput,
-    })
-
-    addEvent({
-      type: 'settings',
-      title: 'Connection Settings Saved',
-      detail: `Target host set to ${hostInput.trim() || 'empty'}`,
-    })
-
-    toast.success('Settings saved to local storage')
-  }
-
-  const handleTestConnection = () => {
-    toast.info('Test Connection is disabled in Phase 1', {
-      description: 'Dynamic IP discovery and ping latency tests are implemented in Phase 3.',
-    })
-  }
 
   const handleCheckBackendHealth = async () => {
     if (!settings.connection.host) {
@@ -135,11 +69,6 @@ export function SettingsPage() {
 
   const handleResetDefaults = () => {
     settings.resetToDefaults()
-    setHostInput(defaultSettings.connection.host)
-    setBackendPortInput(String(defaultSettings.connection.backendPort))
-    setRosbridgePortInput(String(defaultSettings.connection.rosbridgePort))
-    setUseSslInput(defaultSettings.connection.useSsl)
-    setErrors({})
     toast.success('Settings reset to factory defaults')
   }
 
@@ -177,97 +106,7 @@ export function SettingsPage() {
 
         {/* 1. Connection Settings Tab */}
         <TabsContent value="connection">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base font-semibold">Robot Network Configuration</CardTitle>
-              <CardDescription className="text-xs">
-                Target IP address or hostname of your NVIDIA Jetson host. Settings are persisted in
-                local storage.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSaveConnection} className="space-y-4 max-w-xl">
-                <div className="space-y-1.5">
-                  <Label htmlFor="host-address">Robot Host Address (IP or Hostname)</Label>
-                  <Input
-                    id="host-address"
-                    value={hostInput}
-                    onChange={(e) => setHostInput(e.target.value)}
-                    placeholder="192.168.x.x or jetson.local"
-                    className="font-mono min-h-[44px]"
-                  />
-                  {errors.host ? (
-                    <p className="text-xs text-rose-500 font-medium flex items-center gap-1">
-                      <AlertCircle className="h-3 w-3" />
-                      {errors.host}
-                    </p>
-                  ) : (
-                    <p className="text-[11px] text-muted-foreground">
-                      Enter the local Wi-Fi IP address or mDNS hostname (.local) assigned to the
-                      Jetson.
-                    </p>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="backend-port">FastAPI Backend Port</Label>
-                    <Input
-                      id="backend-port"
-                      value={backendPortInput}
-                      onChange={(e) => setBackendPortInput(e.target.value)}
-                      placeholder="8000"
-                      className="font-mono min-h-[44px]"
-                    />
-                    {errors.backendPort && (
-                      <p className="text-xs text-rose-500">{errors.backendPort}</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label htmlFor="rosbridge-port">rosbridge WebSocket Port</Label>
-                    <Input
-                      id="rosbridge-port"
-                      value={rosbridgePortInput}
-                      onChange={(e) => setRosbridgePortInput(e.target.value)}
-                      placeholder="9090"
-                      className="font-mono min-h-[44px]"
-                    />
-                    {errors.rosbridgePort && (
-                      <p className="text-xs text-rose-500">{errors.rosbridgePort}</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between p-3 rounded-lg border border-border">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="ssl-toggle" className="cursor-pointer">
-                      Use Secure Sockets (HTTPS / WSS)
-                    </Label>
-                    <p className="text-xs text-muted-foreground">
-                      Enable if reverse-proxy TLS termination is configured on the Jetson (Planned
-                      Phase 13).
-                    </p>
-                  </div>
-                  <Switch id="ssl-toggle" checked={useSslInput} onCheckedChange={setUseSslInput} />
-                </div>
-
-                <div className="flex items-center gap-3 pt-2">
-                  <Button type="submit" className="min-h-[44px]">
-                    Save Settings
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleTestConnection}
-                    className="min-h-[44px]"
-                  >
-                    Test Connection
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
+          <ConnectionWizard />
         </TabsContent>
 
         {/* 2. Appearance Tab */}

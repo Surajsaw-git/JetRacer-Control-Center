@@ -52,3 +52,6 @@ frontend/android/local.properties
 *.keystore
 *.jks
 .gradle/
+
+# Robot references / unsanitized operator work logs
+docs/references/

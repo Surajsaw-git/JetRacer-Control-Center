@@ -167,7 +167,57 @@
 
 ---
 
-## 6. Reusable Progress Report Template (Copy after each phase)
+## 6. Phase 3 Progress Report: IP Connection Flow
+
+- **Date Completed:** 2026-11-01
+- **Status:** **Done, tested against local mock only, not tested on the physical robot**
+- **What Was Created / Modified:**
+  - **Operator Handoff Review & Safety Audit:**
+    - Read operator handoff notes (`docs/references/JETRACER_HANDOFF1.md` and `JETRACER_HANDOFF2.md.MD`); safeguarded private notes by adding `docs/references/` to `.gitignore`.
+    - Created `docs/ROBOT_STATE.md` documenting JetRacer hardware (Nano eMMC, RP2040, RPLIDAR A1, TGZ controller), Ubuntu 18.04 / Python 3.6 / ROS Melodic environment, and continuous 20 Hz zero-velocity publication by `joy_teleop.py`.
+    - Updated `docs/ROS_TOPICS.md` with an "Operator-Reported, Unverified Topics" section while keeping all verification status strictly `NOT YET INSPECTED`.
+  - **Two-Link Architecture Alignment:**
+    - Documented Link A (rosbridge WebSocket port 9090, mandatory for robot state) and Link B (FastAPI backend port 8000, optional auxiliary API) in `docs/ARCHITECTURE.md` and `docs/DEPLOYMENT.md`.
+  - **Backend LAN Development Support:**
+    - Added `ALLOWED_ORIGIN_REGEX: Optional[str] = None` to `backend/app/core/config.py` with syntax compilation validation and strict production guard rejecting match-all wildcards.
+    - Updated `CORSMiddleware` in `main.py` and `validate_origin()` in `services/ws_manager.py` to match client origins against the regex.
+    - Added unit tests in `test_settings.py` and `test_websocket.py` (all 48 tests passing).
+  - **Robot Field Tools & Scripts (`robot/`):**
+    - `robot/scripts/preflight.sh`: 100% read-only diagnostic audit of OS, kernel, resources, IP, ROS distro, master status, and rosbridge installation.
+    - `robot/scripts/install_rosbridge.sh`: Purely additive apt installer requiring operator typed confirmation (`INSTALL`).
+    - `robot/launch/jetracer_rosbridge.launch`: Standard launch wrapper for port 9090 on `0.0.0.0` with `authenticate: false`.
+    - `robot/scripts/start_rosbridge.sh`: Safe launcher that verifies master is alive before starting port 9090.
+    - `robot/scripts/collect_ros_info.sh`: 100% read-only deep inspection tool querying all nodes, topics, Hz rates (3s timeout per topic), services, parameters, and TF transforms into `~/jetracer_inspection_<timestamp>.txt`.
+    - `robot/README.md` and `docs/FIRST_CONNECTION_RUNBOOK.md` detailing step-by-step procedures and fallback matrix for tomorrow's live college visit.
+  - **Dev-Only Mock Rosbridge Server (`tools/mock-rosbridge/`):**
+    - Standalone Node.js server speaking rosbridge v2 protocol on `127.0.0.1:9090`.
+    - Handles `/rosapi/get_time` with live timestamps; rejects unallowed services with polite `result: false`.
+    - Edge-case testing flags: `--refuse`, `--hang`, `--drop`, `--delay <ms>`.
+    - NPM script: `npm run mock:rosbridge`.
+  - **Frontend UI & Connection Lifecycle:**
+    - Address parser & URL builder (`utils/validators.ts`): Parses bare IPs, hostnames (`jetracer.local`), URLs, port numbers, trailing slashes; detects loopback addresses and mixed-content HTTPS risks; explicitly rejects `0.0.0.0` and `255.255.255.255`.
+    - Rosbridge client wrapper (`services/rosbridgeClient.ts`): State machine (`disconnected`, `connecting`, `connected`, `reconnecting`, `error`), connect timeout (5000 ms), exponential backoff with jitter (1s -> 2s -> 4s -> max 10s, max 5 attempts), heartbeat via `/rosapi/get_time` (5s active, 15s battery-saver hidden), and online/offline listeners.
+    - **Strict Read-Only Enforcement:** Guard allowing solely `/rosapi/get_time` service calls; throws `SECURITY VIOLATION` error in dev/test if publish, advertise, subscribe, or any other service is invoked.
+    - UI Components:
+      - `ConnectionWizard` in Settings with target address input, Quick-fill Mock (127.0.0.1) button, localStorage persistence and forget button, Link A & Link B diagnostic cards, and Redacted Copy Diagnostics export.
+      - `ConnectionChip` in top header with status-colored indicator dots, latency display, and tooltips.
+      - Prominent safety warning banners and confirmation modals on `ControlPage.tsx` and `EmergencyStopButton.tsx` warning that software E-Stop is NOT wired in Phase 3.
+- **Installed Packages / Tools:**
+  - `ws==8.22.1` and `@types/ws==8.5.14` added to frontend devDependencies.
+- **Verification & Test Results:**
+  - `backend/`: `ruff check .` passed (0 errors), `pytest` passed (**48 tests passed**).
+  - `frontend/`: `npm run typecheck` passed (0 errors), `npm run lint` passed (0 errors), `npm run test` passed (**61 tests passed across 13 test suites**), `npm run build` passed (401 kB JS bundle).
+- **Known Limitations & Issues:**
+  - Physical Robot: NOT YET TESTED ON THE PHYSICAL ROBOT. Testing scheduled for tomorrow's field visit.
+  - College Wi-Fi Isolation: University networks frequently block peer-to-peer packets; runbook instructs using smartphone mobile hotspot as fallback.
+  - Jetson Python 3.6: FastAPI backend cannot be installed directly on Jetson Nano; Link B is treated as optional in Phase 3.
+- **Hardware Verification:**
+  - **NOT HARDWARE TESTED.** Verified solely against local mock rosbridge server and automated Vitest/Pytest suites.
+- **Next Steps:** Physical field testing tomorrow following `docs/FIRST_CONNECTION_RUNBOOK.md`, followed by Phase 4 (ROS Integration & Topic Mapping).
+
+---
+
+## 7. Reusable Progress Report Template (Copy after each phase)
 
 ```markdown
 ### Phase X Progress Report: [Phase Title]

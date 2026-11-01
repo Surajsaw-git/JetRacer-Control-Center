@@ -43,8 +43,10 @@ docker run -d --name jetracer-backend \
   jetracer-backend:latest
 ```
 
-### Option C: Offboard Host on Same LAN
+### Option C: Offboard Host on Same LAN (Primary for Initial Robot Testing)
 Run the backend on a development laptop or workstation connected to the same Wi-Fi router. The backend connects to the Jetson robot solely over WebSocket at `ws://<JETSON_IP>:9090` (Phase 4).
+
+> **Note on Initial Hardware Testing:** The JetRacer Jetson Nano runs Ubuntu 18.04 (Bionic) with default Python 3.6 (`docs/ROBOT_STATE.md`). Attempting to force-install Python 3.10+ on the Jetson risks breaking system packages and Melodic dependencies. Therefore, in initial connection tests (Phase 3), the frontend client will communicate directly with `rosbridge_suite` (port 9090) on the Jetson. The FastAPI backend remains on the operator's laptop or workstation.
 
 ---
 

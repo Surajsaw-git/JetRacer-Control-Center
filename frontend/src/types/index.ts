@@ -6,6 +6,13 @@
 export type ConnectionStatus =
   'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error'
 
+export type BackendLinkStatus = 'connected' | 'unreachable' | 'checking' | 'disabled'
+
+export interface RosTimestamp {
+  secs: number
+  nsecs: number
+}
+
 export interface ConnectionState {
   status: ConnectionStatus
   host: string
@@ -15,6 +22,13 @@ export interface ConnectionState {
   latencyMs: number | null
   lastConnected: string | null
   errorMessage: string | null
+  rosTime?: RosTimestamp | null
+  reconnectAttempt?: number
+  maxReconnectAttempts?: number
+  linkBStatus?: BackendLinkStatus
+  linkBLatencyMs?: number | null
+  linkBVersion?: string | null
+  connectionStep?: string | null
 }
 
 export interface SystemMetrics {
