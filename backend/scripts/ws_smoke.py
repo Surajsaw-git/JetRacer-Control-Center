@@ -40,7 +40,7 @@ async def run_smoke_test(
         info_data = r_info.json()
         print(f"  [OK] App Name: {info_data['app_name']}")
         print(f"  [OK] Platform: {info_data['platform']}")
-        ros_cap = info_data['capabilities']['ros']
+        ros_cap = info_data["capabilities"]["ros"]
         print(f"  [OK] ROS capability: {ros_cap['status']} (Phase {ros_cap['planned_phase']})")
 
     # 4. Test WebSocket Multiplexer

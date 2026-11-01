@@ -249,12 +249,9 @@ def test_ws_origin_regex_rejects_unmatched_origin(test_settings):
     app_with_regex = create_app(test_settings)
     with TestClient(app_with_regex) as client:
         with pytest.raises(WebSocketDisconnect) as exc_info:
-            with client.websocket_connect(
-                "/api/v1/ws", headers={"Origin": "http://10.0.0.5:5173"}
-            ):
+            with client.websocket_connect("/api/v1/ws", headers={"Origin": "http://10.0.0.5:5173"}):
                 pass
         assert exc_info.value.code == CLOSE_POLICY_VIOLATION
-
 
 
 def test_ws_max_connections_enforced(test_settings):

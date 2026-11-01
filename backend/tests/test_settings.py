@@ -86,4 +86,3 @@ def test_production_allows_strict_origin_regex():
     strict_regex = r"^https?://(192\.168\.1\.\d+)(:\d+)?$"
     settings = Settings(ENVIRONMENT="production", ALLOWED_ORIGIN_REGEX=strict_regex)
     assert settings.ALLOWED_ORIGIN_REGEX == strict_regex
-

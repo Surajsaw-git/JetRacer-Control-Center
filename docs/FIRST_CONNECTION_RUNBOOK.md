@@ -47,16 +47,25 @@ flowchart TD
 
 1. Power on the JetRacer battery switch.
 2. Allow ~45 seconds for Ubuntu 18.04 and ROS Melodic to boot.
-3. **Primary method (OLED Display):**
-   - Read the IP address displayed on the small I2C OLED screen on the robot chassis (e.g. `192.168.1.105` or `10.x.x.x`).
-4. **Router admin page / Hotspot client list:**
-   - Look for hostname `jetson` or the MAC address of the Jetson Wi-Fi card.
-5. **CLI Discovery from your laptop (if on same network):**
+3. **Direct HDMI & Keyboard Fallback (Most Reliable First Time):**
+   - Connect an HDMI monitor and USB keyboard directly to the Jetson Nano.
+   - Log in with `<robot-username>` and run:
+     ```bash
+     hostname -I
+     ```
+     The first IPv4 address listed is your robot's local IP address.
+4. **Personal Mobile Hotspot Client List (Recommended at College):**
+   - College campus Wi-Fi networks typically enforce **AP Client Isolation** or require captive portal login, blocking direct peer-to-peer traffic.
+   - Connect both your development laptop and the Jetson to your personal smartphone mobile hotspot.
+   - Open your phone's "Hotspot / Tethering" settings and check the "Connected devices" list to immediately view the assigned robot IP.
+5. **OLED Display Method — [UNVERIFIED CLAIM]:**
+   - *Note: OLED IP display availability is unverified until tested on the physical robot.* If your robot has the Waveshare OLED service active and properly configured, read the IP address shown on the small chassis OLED screen. Do not rely exclusively on this method.
+6. **CLI Discovery from your laptop (if on same subnet without client isolation):**
    ```bash
    # Scan local subnet (example for 192.168.1.0/24)
    nmap -sn 192.168.1.0/24
-   # Or ping local mDNS name:
-   ping jetson.local
+   # Or ping local mDNS name (if avahi-daemon is running on robot):
+   ping <robot-hostname>.local
    ```
 
 ---
@@ -66,10 +75,10 @@ flowchart TD
 From your laptop terminal:
 ```bash
 # Copy helper scripts to Jetson home directory
-scp -r robot jetson@<robot-ip>:~/jetracer-robot
+scp -r robot <robot-username>@<robot-ip>:~/jetracer-robot
 
 # SSH into Jetson
-ssh jetson@<robot-ip>
+ssh <robot-username>@<robot-ip>
 ```
 
 On the Jetson shell:
@@ -149,7 +158,7 @@ cd ~/jetracer-robot/scripts
 - Copy this back to your development laptop:
   ```bash
   # Run from your laptop:
-  scp jetson@<robot-ip>:~/jetracer_inspection_*.txt docs/
+  scp <robot-username>@<robot-ip>:~/jetracer_inspection_*.txt docs/
   ```
 
 ---
