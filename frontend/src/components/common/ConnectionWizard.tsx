@@ -54,11 +54,12 @@ export function ConnectionWizard() {
     if (typeof window === 'undefined') return
     const params = new URLSearchParams(window.location.search)
     const autoConnect = params.get('autoConnect') === 'true'
-    const targetHost = params.get('host') || addressInput
+    const stored = useSettingsStore.getState().connection
+    const targetHost = params.get('host') || stored.host
 
     if (autoConnect && targetHost) {
-      const rPort = Number(params.get('rosbridgePort')) || Number(rosbridgePortInput) || 9090
-      const bPort = Number(params.get('backendPort')) || Number(backendPortInput) || 8000
+      const rPort = Number(params.get('rosbridgePort')) || stored.rosbridgePort || 9090
+      const bPort = Number(params.get('backendPort')) || stored.backendPort || 8000
       rosbridgeClient.connect(targetHost, rPort, bPort)
     }
   }, [])

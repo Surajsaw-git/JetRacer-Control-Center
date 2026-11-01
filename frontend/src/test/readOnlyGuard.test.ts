@@ -38,4 +38,16 @@ describe('Strict Read-Only Enforcement (Phase 3 Guard)', () => {
       client.callService('/reset_odometry', 'std_srvs/Empty')
     }).toThrowError(/SECURITY VIOLATION.*strictly read-only.*call_service/i)
   })
+
+  it('unconditionally blocks and throws in production mode with no bypass', () => {
+    const client = new RosbridgeClient()
+    // Verify that assertReadOnlyAllowed throws directly regardless of environment
+    expect(() => {
+      client.publish('/any_topic', {})
+    }).toThrowError(/SECURITY VIOLATION/i)
+
+    expect(() => {
+      client.advertise('/any_topic', 'std_msgs/String')
+    }).toThrowError(/SECURITY VIOLATION/i)
+  })
 })

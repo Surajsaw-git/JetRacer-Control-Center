@@ -69,6 +69,7 @@ class Settings(BaseSettings):
         """Ensure ALLOWED_ORIGIN_REGEX compiles to a valid regular expression."""
         if v is not None:
             import re
+
             try:
                 re.compile(v)
             except re.error as exc:
@@ -90,6 +91,7 @@ class Settings(BaseSettings):
             )
         if is_prod and self.ALLOWED_ORIGIN_REGEX:
             import re
+
             # Check for patterns matching every origin or arbitrary external origins
             pattern = re.compile(self.ALLOWED_ORIGIN_REGEX)
             if pattern.search("https://arbitrary-untrusted-site.com"):

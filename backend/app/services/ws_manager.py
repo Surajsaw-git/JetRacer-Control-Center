@@ -141,6 +141,7 @@ class WebSocketManager:
 
         if self._settings.ALLOWED_ORIGIN_REGEX:
             import re
+
             return bool(re.search(self._settings.ALLOWED_ORIGIN_REGEX, origin))
 
         return False

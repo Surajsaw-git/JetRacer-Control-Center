@@ -5,11 +5,23 @@
  * and strict Phase 3 read-only enforcement.
  */
 
-import { Ros, Service } from 'roslib'
+import type { Ros } from 'roslib'
 import { useConnectionStore } from '@/store/connectionStore'
 import { useSettingsStore } from '@/store/settingsStore'
 import { buildBackendUrl, buildRosbridgeUrl } from '@/utils/validators'
 import type { ConnectionStatus, RosTimestamp } from '@/types'
+
+/**
+ * Lazy module loader for roslib to prevent bundle bloat in main chunk.
+ */
+let roslibModulePromise: Promise<typeof import('roslib')> | null = null
+
+export function getRoslib(): Promise<typeof import('roslib')> {
+  if (!roslibModulePromise) {
+    roslibModulePromise = import('roslib')
+  }
+  return roslibModulePromise
+}
 
 /**
  * Strict allow-list of services permitted in Phase 3.
@@ -136,35 +148,36 @@ export class RosbridgeClient {
   /**
    * Internal connection attempt with timeout and socket event handlers.
    */
-  private attemptRosbridgeConnection(): Promise<boolean> {
+  private async attemptRosbridgeConnection(): Promise<boolean> {
+    const targetUrl = buildRosbridgeUrl(this.host, this.rosbridgePort)
+    useConnectionStore.getState().setConnectionStep(`Connecting to ${targetUrl}...`)
+
+    try {
+      const { Ros } = await getRoslib()
+      this.ros = new Ros({
+        url: targetUrl,
+      })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      this.transitionTo('error', `Failed to initialize Rosbridge socket: ${msg}`)
+      return false
+    }
+
+    const rosInstance = this.ros
+    if (!rosInstance) return false
+
     return new Promise((resolve) => {
-      const targetUrl = buildRosbridgeUrl(this.host, this.rosbridgePort)
-      useConnectionStore.getState().setConnectionStep(`Connecting to ${targetUrl}...`)
-
-      try {
-        this.ros = new Ros({
-          url: targetUrl,
-        })
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err)
-        this.transitionTo('error', `Failed to initialize Rosbridge socket: ${msg}`)
-        resolve(false)
-        return
-      }
-
       let hasSettled = false
 
       // Timeout watchdog
       this.connectTimer = setTimeout(() => {
         if (!hasSettled) {
           hasSettled = true
-          if (this.ros) {
-            this.isIntentionalDisconnect = true
-            try {
-              this.ros.close()
-            } catch {
-              // Ignore
-            }
+          this.isIntentionalDisconnect = true
+          try {
+            rosInstance.close()
+          } catch {
+            // Ignore
           }
           const timeoutMsg = `Timed out connecting to ${this.host}:${this.rosbridgePort}. Are you on the same Wi-Fi? Can you ping the robot?`
           this.transitionTo('error', timeoutMsg)
@@ -173,7 +186,7 @@ export class RosbridgeClient {
       }, this.options.connectTimeoutMs)
 
       // Connection established
-      this.ros.on('connection', () => {
+      rosInstance.on('connection', () => {
         if (hasSettled) return
         hasSettled = true
         if (this.connectTimer) {
@@ -219,7 +232,7 @@ export class RosbridgeClient {
       })
 
       // Connection error
-      this.ros.on('error', (_error) => {
+      rosInstance.on('error', (_error) => {
         if (hasSettled) {
           // If already connected, delegate to close/reconnect handler
           return
@@ -236,7 +249,7 @@ export class RosbridgeClient {
       })
 
       // Connection closed
-      this.ros.on('close', () => {
+      rosInstance.on('close', () => {
         if (this.connectTimer) {
           clearTimeout(this.connectTimer)
           this.connectTimer = null
@@ -269,6 +282,7 @@ export class RosbridgeClient {
     }
 
     const startTime = Date.now()
+    const { Service } = await getRoslib()
 
     return new Promise((resolve) => {
       let isTimedOut = false
@@ -429,7 +443,8 @@ export class RosbridgeClient {
 
   /**
    * Strict Read-Only Guard.
-   * Throws Error in dev/test; no-ops with console warning in production.
+   * Throws Error unconditionally across all environments (dev, test, and production).
+   * Forbidden operations are never transmitted over the socket.
    */
   private assertReadOnlyAllowed(operation: string, target?: string): void {
     const isAllowedService =
@@ -441,18 +456,9 @@ export class RosbridgeClient {
       return
     }
 
-    const violationMessage = `[SECURITY VIOLATION] Phase 3 RosbridgeClient is strictly read-only. Attempted operation "${operation}" on "${target || 'unspecified'}" is prohibited.`
+    const violationMessage = `[SECURITY VIOLATION] RosbridgeClient is strictly read-only. Attempted operation "${operation}" on "${target || 'unspecified'}" is prohibited.`
 
-    const isDevOrTest =
-      import.meta.env.DEV ||
-      import.meta.env.MODE !== 'production' ||
-      (typeof window !== 'undefined' && Boolean((window as unknown as { __VITEST__?: boolean }).__VITEST__))
-
-    if (isDevOrTest) {
-      throw new Error(violationMessage)
-    } else {
-      console.warn(violationMessage)
-    }
+    throw new Error(violationMessage)
   }
 
   /**
@@ -469,18 +475,20 @@ export class RosbridgeClient {
       return Promise.reject(new Error('Rosbridge socket is not connected.'))
     }
 
-    return new Promise((resolve, reject) => {
-      const srv = new Service({
-        ros: this.ros!,
-        name: serviceName,
-        serviceType,
-      })
+    return getRoslib().then(({ Service }) => {
+      return new Promise((resolve, reject) => {
+        const srv = new Service({
+          ros: this.ros!,
+          name: serviceName,
+          serviceType,
+        })
 
-      srv.callService(
-        requestPayload,
-        (res: unknown) => resolve(res),
-        (err: unknown) => reject(new Error(String(err))),
-      )
+        srv.callService(
+          requestPayload,
+          (res: unknown) => resolve(res),
+          (err: unknown) => reject(new Error(String(err))),
+        )
+      })
     })
   }
 
