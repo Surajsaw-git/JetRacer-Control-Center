@@ -58,7 +58,7 @@ JetRacer Control Center is a comprehensive, multi-platform robotics command and 
 | **State & Networking** | Zustand + TanStack Query + roslibjs | Client state, persisted settings, ROS WebSocket client |
 | **Mobile Shell** | Capacitor Android | Native Android container with cleartext LAN support |
 | **Backend Framework** | FastAPI + Uvicorn | Python 3.8+ compatible async REST API |
-| **Persistence** | SQLAlchemy 2.0 | SQLite embedded default, PostgreSQL-ready |
+| **Persistence** | SQLAlchemy 2.1.6 (2.x) | SQLite embedded default, PostgreSQL-ready |
 | **Quality & Tests** | Vitest + React Testing Library + Axe-Core + Pytest | Automated frontend & backend test gates |
 
 ---
