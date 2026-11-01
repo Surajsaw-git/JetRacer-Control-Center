@@ -1,17 +1,26 @@
 import { create } from 'zustand'
-import type { ConnectionState, ConnectionStatus } from '@/types'
+import type {
+  BackendLinkStatus,
+  ConnectionState,
+  ConnectionStatus,
+  RosTimestamp,
+} from '@/types'
 
 export interface ConnectionStoreState extends ConnectionState {
-  setConnecting: () => void
-  setConnected: (latencyMs?: number) => void
-  setReconnecting: () => void
-  setDisconnected: () => void
+  setHostInfo: (host: string, rosbridgePort?: number, backendPort?: number) => void
+  setConnecting: (step?: string) => void
+  setConnected: (latencyMs?: number, rosTime?: RosTimestamp | null) => void
+  setReconnecting: (attempt?: number, maxAttempts?: number) => void
+  setDisconnected: (errorMessage?: string | null) => void
   setError: (errorMessage: string) => void
+  setHeartbeat: (latencyMs: number, rosTime?: RosTimestamp | null) => void
+  setLinkB: (status: BackendLinkStatus, latencyMs?: number | null, version?: string | null) => void
+  setConnectionStep: (step: string | null) => void
   reset: () => void
 }
 
 const initialState: ConnectionState = {
-  status: 'disconnected', // Phase 1 is strictly disconnected by default
+  status: 'disconnected',
   host: '',
   backendPort: 8000,
   rosbridgePort: 9090,
@@ -19,35 +28,58 @@ const initialState: ConnectionState = {
   latencyMs: null,
   lastConnected: null,
   errorMessage: null,
+  rosTime: null,
+  reconnectAttempt: 0,
+  maxReconnectAttempts: 5,
+  linkBStatus: 'unreachable',
+  linkBLatencyMs: null,
+  linkBVersion: null,
+  connectionStep: null,
 }
 
 export const useConnectionStore = create<ConnectionStoreState>((set) => ({
   ...initialState,
 
-  setConnecting: () =>
+  setHostInfo: (host, rosbridgePort = 9090, backendPort = 8000) =>
+    set({
+      host,
+      rosbridgePort,
+      backendPort,
+    }),
+
+  setConnecting: (step = 'Initiating connection...') =>
     set({
       status: 'connecting',
+      connectionStep: step,
       errorMessage: null,
     }),
 
-  setConnected: (latencyMs = 15) =>
+  setConnected: (latencyMs = 15, rosTime = null) =>
     set({
       status: 'connected',
       latencyMs,
+      rosTime,
       lastConnected: new Date().toISOString(),
       errorMessage: null,
+      connectionStep: null,
+      reconnectAttempt: 0,
     }),
 
-  setReconnecting: () =>
+  setReconnecting: (attempt = 1, maxAttempts = 5) =>
     set({
       status: 'reconnecting',
+      reconnectAttempt: attempt,
+      maxReconnectAttempts: maxAttempts,
+      connectionStep: `Reconnecting (attempt ${attempt}/${maxAttempts})...`,
     }),
 
-  setDisconnected: () =>
+  setDisconnected: (errorMessage = null) =>
     set({
       status: 'disconnected',
       latencyMs: null,
-      errorMessage: null,
+      errorMessage: errorMessage ?? null,
+      connectionStep: null,
+      reconnectAttempt: 0,
     }),
 
   setError: (errorMessage: string) =>
@@ -55,7 +87,23 @@ export const useConnectionStore = create<ConnectionStoreState>((set) => ({
       status: 'error',
       errorMessage,
       latencyMs: null,
+      connectionStep: null,
     }),
+
+  setHeartbeat: (latencyMs: number, rosTime = null) =>
+    set((state) => ({
+      latencyMs,
+      rosTime: rosTime || state.rosTime,
+    })),
+
+  setLinkB: (linkBStatus, linkBLatencyMs = null, linkBVersion = null) =>
+    set({
+      linkBStatus,
+      linkBLatencyMs,
+      linkBVersion,
+    }),
+
+  setConnectionStep: (connectionStep) => set({ connectionStep }),
 
   reset: () => set(initialState),
 }))
