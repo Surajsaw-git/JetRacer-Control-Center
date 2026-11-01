@@ -1,6 +1,26 @@
-"""Pydantic schemas package.
+"""Pydantic schemas package."""
 
-Intended responsibility: Request and response validation schemas for REST API endpoints
-and WebSocket message payloads across all robot subsystems.
-Planned for implementation in: Phase 2 (Backend foundation) and Phase 11 (Database).
-"""
+from app.schemas.errors import ErrorDetail, ErrorEnvelope
+from app.schemas.health import HealthResponse, ReadinessComponentStatus, ReadinessResponse
+from app.schemas.system import (
+    CapabilityMap,
+    ConfigResponse,
+    InfoResponse,
+    SubsystemCapability,
+    WsStatsResponse,
+)
+from app.schemas.ws import WsEnvelope
+
+__all__ = [
+    "ErrorDetail",
+    "ErrorEnvelope",
+    "HealthResponse",
+    "ReadinessComponentStatus",
+    "ReadinessResponse",
+    "SubsystemCapability",
+    "CapabilityMap",
+    "InfoResponse",
+    "ConfigResponse",
+    "WsStatsResponse",
+    "WsEnvelope",
+]
