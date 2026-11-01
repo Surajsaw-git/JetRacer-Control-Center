@@ -1,0 +1,32 @@
+<launch>
+  <!--
+    JetRacer Control Center - Rosbridge Server Launch Configuration
+    Phase 3: Network Connection and Health Probing.
+    This launch file wraps the standard ROS rosbridge_server with
+    safe defaults for local wireless robot management.
+  -->
+
+  <!-- Port for WebSocket clients (JetRacer Control Center web & Android client) -->
+  <arg name="port" default="9090" doc="WebSocket listening port for rosbridge (default: 9090)" />
+
+  <!-- Address binding: 0.0.0.0 binds to all available network interfaces (Wi-Fi, ethernet, loopback) -->
+  <arg name="address" default="0.0.0.0" doc="IP address to bind WebSocket server (0.0.0.0 for LAN access)" />
+
+  <!-- Authentication disabled for initial local LAN testing (Phase 13 introduces token authentication) -->
+  <arg name="authenticate" default="false" doc="Whether to enforce rosauth authentication" />
+
+  <!-- Unregister timeout in seconds: how long to wait before tearing down subscribers when disconnected -->
+  <arg name="unregister_timeout" default="10.0" doc="Timeout in seconds before unregistering subscribers on disconnect" />
+
+  <!-- Message size limits and retry intervals -->
+  <arg name="max_message_size" default="None" doc="Maximum allowed incoming payload size in bytes" />
+
+  <!-- Include the upstream rosbridge_server websocket launcher -->
+  <include file="$(find rosbridge_server)/launch/rosbridge_websocket.launch">
+    <arg name="port" value="$(arg port)" />
+    <arg name="address" value="$(arg address)" />
+    <arg name="authenticate" value="$(arg authenticate)" />
+    <arg name="unregister_timeout" value="$(arg unregister_timeout)" />
+    <arg name="max_message_size" value="$(arg max_message_size)" />
+  </include>
+</launch>
