@@ -17,6 +17,8 @@ export function RosStatusTab() {
   const host = useConnectionStore((state) => state.host)
   const status = useRosStatusStore((state) => state.status)
   const latencyMs = useRosStatusStore((state) => state.latencyMs)
+  const latencyMedianMs = useRosStatusStore((state) => state.latencyMedianMs)
+  const highLatencyWarning = useRosStatusStore((state) => state.highLatencyWarning)
   const rosTime = useRosStatusStore((state) => state.rosTime)
   const clockOffsetSecs = useRosStatusStore((state) => state.clockOffsetSecs)
   const clockExplanation = useRosStatusStore((state) => state.clockOffsetExplanation)
@@ -82,6 +84,7 @@ export function RosStatusTab() {
               <span className="text-muted-foreground">rosapi Ping Latency</span>
               <span className="font-mono font-medium">
                 {latencyMs !== null ? `${latencyMs} ms` : '--'}
+                {latencyMedianMs !== null ? ` (median: ${latencyMedianMs} ms)` : ''}
               </span>
             </div>
             <div className="flex justify-between py-1">
@@ -90,6 +93,11 @@ export function RosStatusTab() {
                 {lastHeartbeatAt ? new Date(lastHeartbeatAt).toLocaleTimeString() : '--'}
               </span>
             </div>
+            {highLatencyWarning && (
+              <p className="text-[11px] text-amber-500 bg-amber-500/10 p-2 rounded mt-2 border border-amber-500/20">
+                {highLatencyWarning}
+              </p>
+            )}
             {errorMessage && (
               <p className="text-[11px] text-rose-500 bg-rose-500/10 p-2 rounded mt-2">
                 {errorMessage}

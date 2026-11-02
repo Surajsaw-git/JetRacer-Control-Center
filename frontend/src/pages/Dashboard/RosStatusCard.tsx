@@ -35,9 +35,12 @@ export function RosStatusCard() {
     } else if (status === 'rosbridge_only') {
       statusBadgeVariant = 'secondary'
       statusBadgeText = 'Rosbridge Only (No rosapi)'
-    } else {
+    } else if (status === 'master_unreachable') {
       statusBadgeVariant = 'destructive'
       statusBadgeText = 'Master Unreachable'
+    } else {
+      statusBadgeVariant = 'outline'
+      statusBadgeText = 'Disconnected'
     }
   }
 

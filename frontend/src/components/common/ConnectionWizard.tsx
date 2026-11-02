@@ -269,7 +269,20 @@ Connection Step:  ${connectionState.connectionStep || 'Idle'}
                     <WifiOff className="h-4 w-4 mr-1.5" />
                     Disconnect
                   </Button>
-                ) : isBusy ? (
+                ) : isReconnecting ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      rosbridgeClient.stopReconnecting()
+                      toast.info('Reconnection stopped.')
+                    }}
+                    className="min-h-[44px] min-w-[110px] border-amber-500/50 text-amber-500 hover:bg-amber-500/10 font-medium"
+                  >
+                    <XCircle className="h-4 w-4 mr-1.5" />
+                    Stop trying
+                  </Button>
+                ) : isConnecting ? (
                   <Button
                     type="button"
                     variant="outline"
@@ -304,6 +317,15 @@ Connection Step:  ${connectionState.connectionStep || 'Idle'}
                   <span>{validationWarning}</span>
                 </p>
               )}
+
+              <div className="text-[11px] text-muted-foreground space-y-0.5 pt-1.5 border-t border-border/30">
+                <p>
+                  Use the robot's address on the network your laptop shares: <strong>hotspot</strong>, <strong>Tailscale</strong>, or <strong>LAN</strong>.
+                </p>
+                <p className="text-[10px] text-muted-foreground/80">
+                  Reachability note: Web browsers cannot send raw ICMP ping packets; the WebSocket handshake serves as the reachability test.
+                </p>
+              </div>
             </div>
 
             {/* Toggle Advanced Ports */}
@@ -359,16 +381,32 @@ Connection Step:  ${connectionState.connectionStep || 'Idle'}
       {/* 2. Connection Progress & State Machine Card */}
       {isBusy && (
         <Card className="border-amber-500/30 bg-amber-500/5">
-          <CardContent className="p-4 flex items-center gap-3">
-            <RefreshCw className="h-5 w-5 text-amber-500 animate-spin flex-shrink-0" />
-            <div className="space-y-1">
-              <p className="text-xs font-semibold text-amber-500 uppercase tracking-wider">
-                Connection in Progress
-              </p>
-              <p className="text-xs text-foreground font-mono">
-                {connectionState.connectionStep || 'Establishing WebSocket handshake...'}
-              </p>
+          <CardContent className="p-4 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <RefreshCw className="h-5 w-5 text-amber-500 animate-spin flex-shrink-0" />
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-amber-500 uppercase tracking-wider">
+                  {isReconnecting ? `Reconnecting (#${connectionState.reconnectAttempt})` : 'Connection in Progress'}
+                </p>
+                <p className="text-xs text-foreground font-mono">
+                  {connectionState.connectionStep || 'Establishing WebSocket handshake...'}
+                </p>
+              </div>
             </div>
+            {isReconnecting && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  rosbridgeClient.stopReconnecting()
+                  toast.info('Reconnection stopped.')
+                }}
+                className="border-amber-500/50 text-amber-500 hover:bg-amber-500/10 text-xs shrink-0"
+              >
+                Stop trying
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}

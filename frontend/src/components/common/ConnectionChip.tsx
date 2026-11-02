@@ -40,7 +40,9 @@ export function ConnectionChip({ className }: ConnectionChipProps) {
     labelText = 'Connecting...'
   } else if (isReconnecting) {
     dotColor = 'bg-amber-500 animate-ping'
-    labelText = `Retry ${reconnectAttempt || 1}/${maxReconnectAttempts || 5}`
+    labelText = maxReconnectAttempts
+      ? `Retry #${reconnectAttempt || 1}/${maxReconnectAttempts}`
+      : `Retry #${reconnectAttempt || 1}`
   } else if (isError) {
     dotColor = 'bg-rose-600'
     labelText = 'Error'
@@ -49,7 +51,7 @@ export function ConnectionChip({ className }: ConnectionChipProps) {
   const tooltipText = isConnected
     ? `Link A (rosbridge) Connected to ${displayHost}:9090 (${latencyMs ?? 0}ms). Click to manage.`
     : isReconnecting
-      ? `Reconnecting to ${displayHost} (attempt ${reconnectAttempt}/${maxReconnectAttempts})...`
+      ? `Reconnecting to ${displayHost} (attempt #${reconnectAttempt || 1})... Click to cancel.`
       : isConnecting
         ? `Connecting to ${displayHost}...`
         : errorMessage

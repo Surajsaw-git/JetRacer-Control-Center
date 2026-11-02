@@ -287,7 +287,31 @@
 
 ---
 
-## 9. Reusable Progress Report Template (Copy after each phase)
+## 9. Field Fix Pass Progress Report: v0.6.2-field-fixes (Post First Robot Contact)
+
+- **Date Completed:** 2026-11-02
+- **Status:** **Done (Field fixes verified against extended local mock; tested on robot by operator earlier)**
+- **What Was Created / Modified:**
+  - **Bug 1 (Indefinite Auto-Reconnect & Jittered Backoff):** Reconnect loop no longer gives up after 5 attempts. Retries indefinitely while auto-reconnect is active with exponential backoff capped at 30s + 20% jitter. Added "Stop trying" control to cancel retries, tab visibility throttling, and backoff reset after 10s stable connection.
+  - **Bug 2 (Honest ROS Status on Link Drop):** Eliminated spurious `master_unreachable` status when WebSocket link drops; status now correctly reports `disconnected` with explanation `"Link to robot is down; the ROS master state is unknown"`. Clarified TCP socket error messages to specify rosbridge rather than robot.
+  - **Bug 3 (Strict Hostname & Dotted Address Validation):** Fixed `isValidHostname` regex to reject purely numeric dotted strings (e.g. `192.168137.43`), ensuring typos cannot bypass IPv4 validation.
+  - **Bug 4 (Latency & Clock Offset Accuracy):** Implemented midpoint RTT clock offset formula $t_{\text{robot}} - (t_{\text{send}} + \text{rtt}/2)$. Added rolling median latency window (5 samples) and high-latency guidance hint when median $> 250\text{ms}$.
+  - **Bug 5 (System Page Dangerous Buttons Disarmed):** Visibly disabled `Restart Backend`, `Reboot Jetson`, and `Shutdown` buttons with informative tooltips explaining Phase 10 integration and ensuring zero network calls or modal dialogues.
+  - **Bug 6 (Stale Labels Removed):** Replaced hard-coded `v0.2.0 / Phase 1 UI` in RootLayout footer with dynamic version `0.6.2 / Phase 5 Integration`. Updated all "NOT WIRED IN PHASE 3" labels to "NOT WIRED YET (planned for Phase 8/13)".
+  - **Bug 7 (Settings Hints Added):** Added connection guidance notes for hotspot, Tailscale, and LAN subnets, plus reachability note explaining ICMP limitations in web browsers.
+- **Verification & Test Results:**
+  - **Frontend:** 125 tests passed across 30 test files (including 6 dedicated field-fix test suites: `reconnectPolicy.test.ts`, `rosStatusDerivation.test.ts`, `addressValidationFix.test.ts`, `latencyClockOffset.test.ts`, `systemPageDangerousButtons.test.tsx`, `staleLabels.test.ts`).
+  - **Typecheck & Lint:** `tsc -b` passed with 0 errors, `eslint .` passed with 0 errors.
+  - **Production Build & Security:** Vite build succeeded, 0 mock strings in `dist/assets/`, `npm audit --omit=dev` reported 0 vulnerabilities.
+  - **Backend:** 48 pytest passed, `ruff check backend` passed, `mypy backend` passed with 0 errors across 37 files.
+  - **Capacitor Android:** `npx cap sync` passed.
+  - **Visual Capture:** 4 screenshots captured in `docs/screenshots/field-fix-1/`.
+- **Hardware Verification:**
+  - **Tested against local mock rosbridge; not tested on robot hardware by assistant.** (Field reproduction derived from physical test by operator on 2026-11-02).
+
+---
+
+## 10. Reusable Progress Report Template (Copy after each phase)
 
 ```markdown
 ### Phase X Progress Report: [Phase Title]

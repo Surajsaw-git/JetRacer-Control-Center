@@ -146,13 +146,13 @@ export function ControlPage() {
           phase="8 Integration"
         />
 
-        {/* Phase 3 Software E-Stop Safety Warning Banner */}
+        {/* Software E-Stop Safety Warning Banner */}
         <div className="p-3.5 rounded-lg bg-rose-500/15 border-2 border-rose-500/40 text-rose-500 dark:text-rose-400 text-xs flex items-center justify-between gap-3 shadow-sm">
           <div className="flex items-center gap-2.5">
             <AlertTriangle className="h-5 w-5 flex-shrink-0 animate-pulse text-rose-500" />
             <div>
               <p className="font-bold tracking-wide uppercase">
-                ⚠️ Software E-Stop is NOT wired in Phase 3.
+                ⚠️ SOFTWARE E-STOP IS NOT WIRED YET (planned for Phase 8/13).
               </p>
               <p className="text-[11px] text-foreground/80 mt-0.5">
                 It will <strong>NOT</strong> stop the physical robot. Always use the robot's physical power switch or the gamepad R1 button to stop.

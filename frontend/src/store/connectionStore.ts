@@ -10,7 +10,8 @@ export interface ConnectionStoreState extends ConnectionState {
   setHostInfo: (host: string, rosbridgePort?: number, backendPort?: number) => void
   setConnecting: (step?: string) => void
   setConnected: (latencyMs?: number, rosTime?: RosTimestamp | null) => void
-  setReconnecting: (attempt?: number, maxAttempts?: number) => void
+  setReconnecting: (attempt?: number, maxAttempts?: number | null) => void
+  stopReconnecting: () => void
   setDisconnected: (errorMessage?: string | null) => void
   setError: (errorMessage: string) => void
   setHeartbeat: (latencyMs: number, rosTime?: RosTimestamp | null) => void
@@ -65,12 +66,22 @@ export const useConnectionStore = create<ConnectionStoreState>((set) => ({
       reconnectAttempt: 0,
     }),
 
-  setReconnecting: (attempt = 1, maxAttempts = 5) =>
+  setReconnecting: (attempt = 1, maxAttempts?: number | null) =>
     set({
       status: 'reconnecting',
       reconnectAttempt: attempt,
-      maxReconnectAttempts: maxAttempts,
-      connectionStep: `Reconnecting (attempt ${attempt}/${maxAttempts})...`,
+      maxReconnectAttempts: maxAttempts ?? null,
+      connectionStep: maxAttempts
+        ? `Reconnecting (attempt ${attempt}/${maxAttempts})...`
+        : `Reconnecting (attempt ${attempt})...`,
+    }),
+
+  stopReconnecting: () =>
+    set({
+      status: 'disconnected',
+      reconnectAttempt: 0,
+      connectionStep: null,
+      errorMessage: 'Reconnection stopped by user.',
     }),
 
   setDisconnected: (errorMessage = null) =>

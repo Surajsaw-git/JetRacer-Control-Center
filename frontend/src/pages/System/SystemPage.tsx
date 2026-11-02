@@ -52,8 +52,10 @@ export function SystemPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setIsRestartServiceOpen(true)}
-              className="min-h-[44px] sm:min-h-[36px]"
+              disabled={true}
+              aria-disabled="true"
+              title="Not available until Phase 10; the app sends no commands to the robot"
+              className="min-h-[44px] sm:min-h-[36px] opacity-50 cursor-not-allowed"
             >
               <RotateCw className="h-4 w-4 mr-1.5" />
               Restart Backend
@@ -61,8 +63,10 @@ export function SystemPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setIsRebootOpen(true)}
-              className="min-h-[44px] sm:min-h-[36px]"
+              disabled={true}
+              aria-disabled="true"
+              title="Not available until Phase 10; the app sends no commands to the robot"
+              className="min-h-[44px] sm:min-h-[36px] opacity-50 cursor-not-allowed"
             >
               <RotateCcw className="h-4 w-4 mr-1.5" />
               Reboot Jetson
@@ -70,8 +74,10 @@ export function SystemPage() {
             <Button
               variant="destructive"
               size="sm"
-              onClick={() => setIsShutdownOpen(true)}
-              className="min-h-[44px] sm:min-h-[36px]"
+              disabled={true}
+              aria-disabled="true"
+              title="Not available until Phase 10; the app sends no commands to the robot"
+              className="min-h-[44px] sm:min-h-[36px] opacity-50 cursor-not-allowed"
             >
               <Power className="h-4 w-4 mr-1.5" />
               Shutdown

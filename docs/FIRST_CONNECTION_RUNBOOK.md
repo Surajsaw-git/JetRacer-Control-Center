@@ -189,3 +189,38 @@ bash start_camera.sh 8080
 - Starts `web_video_server` on port 8080.
 - In Control Center UI, navigate to **Camera** and click **Start Stream**.
 - Refer to [Phase 5 Robot Verification](file:///docs/PHASE5_ROBOT_VERIFICATION.md) for complete runbook.
+
+---
+
+## 7. Field Notes & Diagnostic Commands (From First Live Test, 2026-11-02)
+
+During the first live robot test over private Wi-Fi hotspot, several environmental conditions were observed (high load under SLAM + camera, variable latency 133ms–321ms, memory ~900MB free). Use these diagnostic commands if the link drops or latency spikes:
+
+### Check rosbridge listener and connection states
+```bash
+ss -ltnp | grep 9090
+```
+Verifies rosbridge is listening on port 9090 and checks active socket buffer states.
+
+### Check available memory and OOM killer
+```bash
+free -h
+dmesg | grep -i -E "killed process|out of memory"
+```
+When running heavy nodes (gscam, Cartographer, move_base), Jetson Nano 4GB RAM can deplete, causing the kernel OOM killer to terminate nodes.
+
+### Check Wi-Fi power saving
+```bash
+iw dev wlan0 get power_save
+```
+If power save is `on`, Wi-Fi latency can fluctuate wildly between 50ms and 500ms. Disable power saving with:
+```bash
+sudo iw dev wlan0 set power_save off
+```
+
+### Inspect rosbridge and rosapi logs
+```bash
+rosnode list | grep -E "rosbridge|rosapi"
+rosnode info /rosapi
+```
+Ensures rosbridge and rosapi nodes are alive and handling service queries.

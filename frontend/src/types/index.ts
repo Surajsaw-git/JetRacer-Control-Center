@@ -24,7 +24,7 @@ export interface ConnectionState {
   errorMessage: string | null
   rosTime?: RosTimestamp | null
   reconnectAttempt?: number
-  maxReconnectAttempts?: number
+  maxReconnectAttempts?: number | null
   linkBStatus?: BackendLinkStatus
   linkBLatencyMs?: number | null
   linkBVersion?: string | null

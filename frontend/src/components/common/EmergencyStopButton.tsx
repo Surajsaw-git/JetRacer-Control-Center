@@ -21,8 +21,8 @@ export interface EmergencyStopButtonProps {
 /**
  * Emergency Stop (E-Stop) Trigger.
  *
- * CRITICAL SAFETY REQUIREMENT (PHASE 3):
- * Software E-Stop is NOT wired in Phase 3. It will NOT stop the physical robot.
+ * CRITICAL SAFETY REQUIREMENT:
+ * Software E-Stop is NOT wired yet (planned for Phase 8/13). It will NOT stop the physical robot.
  * Displays prominent warning advising operator to use physical power switch / gamepad R1.
  */
 export function EmergencyStopButton({ className, compact = false }: EmergencyStopButtonProps) {
@@ -31,16 +31,16 @@ export function EmergencyStopButton({ className, compact = false }: EmergencySto
 
   const handleButtonClick = () => {
     setShowWarningModal(true)
-    toast.error('Software E-Stop is NOT wired in Phase 3', {
+    toast.error('Software E-Stop is NOT wired yet (planned for Phase 8/13)', {
       description: 'Use the robot physical power switch or gamepad R1 to halt motion.',
       duration: 6000,
     })
 
     addEvent({
       type: 'safety',
-      title: 'E-STOP Clicked (Phase 3 Not Wired)',
+      title: 'E-STOP Clicked (Not Wired Yet)',
       detail:
-        'Operator pressed E-STOP button. Software E-Stop is NOT wired in Phase 3. Physical switch required.',
+        'Operator pressed E-STOP button. Software E-Stop is NOT wired yet (planned for Phase 8/13). Physical switch required.',
     })
   }
 
@@ -57,8 +57,8 @@ export function EmergencyStopButton({ className, compact = false }: EmergencySto
           compact ? 'px-3 py-1 text-xs' : 'px-4 py-2 text-sm',
           className,
         )}
-        aria-label="Emergency Stop: Software stop is not wired in Phase 3. Use physical power switch."
-        title="⚠️ SOFTWARE E-STOP IS NOT WIRED IN PHASE 3. Use robot power switch or gamepad R1."
+        aria-label="Emergency Stop: Software stop is not wired yet (planned for Phase 8/13). Use physical power switch."
+        title="⚠️ SOFTWARE E-STOP IS NOT WIRED YET (planned for Phase 8/13). Use robot power switch or gamepad R1."
       >
         <OctagonX className="h-5 w-5 mr-1.5 animate-pulse flex-shrink-0" />
         <span>E-STOP</span>
@@ -69,12 +69,12 @@ export function EmergencyStopButton({ className, compact = false }: EmergencySto
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-rose-500 font-bold text-lg">
               <AlertTriangle className="h-6 w-6 text-rose-500 flex-shrink-0" />
-              <span>Software E-Stop Not Wired in Phase 3</span>
+              <span>Software E-Stop Not Wired Yet</span>
             </DialogTitle>
             <DialogDescription asChild>
               <div className="text-foreground/90 space-y-3 pt-2 text-sm">
                 <p className="font-semibold text-rose-400">
-                  ⚠️ SOFTWARE E-STOP IS NOT WIRED IN PHASE 3. It will NOT stop the physical robot.
+                  ⚠️ SOFTWARE E-STOP IS NOT WIRED YET (planned for Phase 8/13). It will NOT stop the physical robot.
                 </p>
                 <p>
                   To immediately halt the robot, you MUST use:
