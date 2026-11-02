@@ -49,16 +49,18 @@ describe('CameraManager (Coordinator & Ref-Counting)', () => {
 
     manager.setQualityPreset('high')
     expect(manager.qualityConfig.preset).toBe('high')
-    expect(manager.qualityConfig.width).toBe(QUALITY_PRESETS.high.width)
+    // High requests native resolution without upscale (width is undefined)
+    expect(manager.qualityConfig.width).toBeUndefined()
+    expect(manager.qualityConfig.fps).toBeLessThanOrEqual(20)
 
     manager.setQualityPreset('custom', {
-      width: 800,
-      height: 600,
-      fps: 25,
+      width: 500,
+      height: 375,
+      fps: 15,
       quality: 80,
     })
     expect(manager.qualityConfig.preset).toBe('custom')
-    expect(manager.qualityConfig.width).toBe(800)
+    expect(manager.qualityConfig.width).toBe(500)
     expect(manager.qualityConfig.quality).toBe(80)
   })
 

@@ -17,10 +17,13 @@ export interface CameraQualityConfig {
   quality: number // 1 to 100 JPEG quality
 }
 
-export const QUALITY_PRESETS: Record<'low' | 'medium' | 'high', { width: number; height: number; fps: number; quality: number }> = {
-  low: { width: 320, height: 240, fps: 15, quality: 50 },
-  medium: { width: 640, height: 480, fps: 20, quality: 70 },
-  high: { width: 1280, height: 720, fps: 30, quality: 90 },
+export const QUALITY_PRESETS: Record<
+  'low' | 'medium' | 'high',
+  { scale: number; width?: number; height?: number; fps: number; quality: number }
+> = {
+  low: { scale: 0.25, width: 160, height: 120, fps: 10, quality: 50 },
+  medium: { scale: 0.5, width: 320, height: 240, fps: 15, quality: 70 },
+  high: { scale: 1.0, fps: 20, quality: 85 }, // Native frame size (never requests upscale beyond measured native)
 }
 
 export type CameraStreamState =

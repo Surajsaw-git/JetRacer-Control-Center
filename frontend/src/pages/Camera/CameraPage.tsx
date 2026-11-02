@@ -234,13 +234,13 @@ export function CameraPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="low" className="text-xs">
-                  Low (320x240, 15fps)
+                  Low (25% scale, 10fps)
                 </SelectItem>
                 <SelectItem value="medium" className="text-xs">
-                  Medium (640x480, 20fps)
+                  Medium (50% scale, 15fps)
                 </SelectItem>
                 <SelectItem value="high" className="text-xs">
-                  High (720p, 30fps)
+                  High (Native scale, 20fps)
                 </SelectItem>
                 <SelectItem value="auto" className="text-xs">
                   Auto (Dynamic Adapt)

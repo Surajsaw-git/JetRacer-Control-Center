@@ -15,9 +15,15 @@ echo "          JetRacer Control Center — Camera Stack Installer              
 echo "================================================================================"
 echo ""
 echo "This script installs packages required for browser video streaming:"
-echo "  1. ros-melodic-web-video-server       (HTTP MJPEG stream on port 8080)"
+echo "  1. ros-melodic-web-video-server        (HTTP MJPEG stream on port 8080)"
 echo "  2. ros-melodic-image-transport-plugins (CompressedImage support)"
-echo "  3. ros-melodic-gscam                  (GStreamer CSI camera ROS node)"
+echo "  3. ros-melodic-gscam                   (GStreamer CSI camera ROS node)"
+echo "  4. v4l-utils                           (Video4Linux hardware diagnostics)"
+echo ""
+echo "[WARNING - SYSTEM RESOURCE LOAD]"
+echo "Running GStreamer CSI capture and web_video_server alongside active 2D SLAM"
+echo "(Gmapping/Cartographer) under 4GB RAM on Jetson Nano can push available memory"
+echo "below 900MB. Do not run high-resolution streams while mapping."
 echo ""
 
 # Verify ROS Melodic
@@ -38,30 +44,59 @@ echo ""
 echo "[INFO] Updating package indices..."
 sudo apt-get update
 
-echo "[INFO] Installing camera streaming packages..."
-sudo apt-get install -y \
-  ros-melodic-web-video-server \
-  ros-melodic-image-transport-plugins \
-  v4l-utils
+CANDIDATE_PACKAGES=(
+  "ros-melodic-web-video-server"
+  "ros-melodic-image-transport-plugins"
+  "ros-melodic-gscam"
+  "v4l-utils"
+)
 
-# Check if ros-melodic-gscam is available in apt repo
-if apt-cache show ros-melodic-gscam >/dev/null 2>&1; then
-  sudo apt-get install -y ros-melodic-gscam
-  echo "[OK] ros-melodic-gscam installed from apt."
-else
+INSTALLABLE=()
+MISSING=()
+
+echo ""
+echo "[INFO] Verifying package availability via apt-cache policy..."
+for pkg in "${CANDIDATE_PACKAGES[@]}"; do
+  candidate=$(apt-cache policy "$pkg" 2>/dev/null | grep "Candidate:" | awk '{print $2}' || true)
+  if [[ -z "$candidate" || "$candidate" == "(none)" ]]; then
+    echo "  [-] $pkg: Candidate is (none) — not available in configured apt repositories."
+    MISSING+=("$pkg")
+  else
+    echo "  [+] $pkg: Candidate available ($candidate)"
+    INSTALLABLE+=("$pkg")
+  fi
+done
+
+if [[ ${#INSTALLABLE[@]} -gt 0 ]]; then
   echo ""
-  echo "[NOTE] 'ros-melodic-gscam' binary was not found in apt cache."
-  echo "If gscam node fails to launch, clone and build it in your catkin workspace:"
-  echo "  cd ~/catkin_ws/src"
-  echo "  git clone https://github.com/ros-drivers/gscam.git"
-  echo "  cd ~/catkin_ws"
-  echo "  catkin_make --pkg gscam"
-  echo "  source ~/catkin_ws/devel/setup.bash"
+  echo "[INFO] Installing verified candidate packages: ${INSTALLABLE[*]}..."
+  sudo apt-get install -y "${INSTALLABLE[@]}"
+  echo "[OK] Installed: ${INSTALLABLE[*]}"
+fi
+
+if [[ ${#MISSING[@]} -gt 0 ]]; then
+  echo ""
+  echo "================================================================================"
+  echo "[ATTENTION] The following packages had candidate '(none)' and were NOT installed:"
+  for m in "${MISSING[@]}"; do
+    echo "  - $m"
+  done
+  echo ""
+  if [[ " ${MISSING[*]} " =~ "ros-melodic-gscam" ]]; then
+    echo "Notice for 'gscam':"
+    echo "The CSI camera node requires gscam. If apt binary is unavailable, build from source:"
+    echo "  cd ~/catkin_ws/src"
+    echo "  git clone https://github.com/ros-drivers/gscam.git"
+    echo "  cd ~/catkin_ws"
+    echo "  catkin_make --pkg gscam"
+    echo "  source ~/catkin_ws/devel/setup.bash"
+  fi
+  echo "================================================================================"
 fi
 
 echo ""
 echo "================================================================================"
-echo "[SUCCESS] Camera stack installation completed."
-echo "You can now launch the web video server with:"
+echo "[SUCCESS] Camera stack verification completed."
+echo "Launch web video server with:"
 echo "  roslaunch robot/launch/jetracer_web_video.launch"
 echo "================================================================================"
