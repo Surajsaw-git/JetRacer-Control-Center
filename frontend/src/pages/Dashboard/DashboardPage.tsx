@@ -1,9 +1,7 @@
-import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Gamepad2,
   Camera,
-  Radar,
   Map,
   Activity,
   Cpu,
@@ -17,21 +15,19 @@ import { PageHeader } from '@/components/common/PageHeader'
 import { MetricCard } from '@/components/common/MetricCard'
 import { StatusBadge } from '@/components/common/StatusBadge'
 import { VideoViewport } from '@/components/common/VideoViewport'
-import { LidarCanvas } from '@/components/common/LidarCanvas'
+import { DashboardLidarCard } from '@/pages/Dashboard/DashboardLidarCard'
 import { RosStatusCard } from '@/pages/Dashboard/RosStatusCard'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useConnectionStore } from '@/store/connectionStore'
 import { useSettingsStore } from '@/store/settingsStore'
 import { useEventLogStore } from '@/store/eventLogStore'
-import { isSimulationEnabled, mockSimulatedMetrics, generateMockLidarScan } from '@/simulation'
+import { isSimulationEnabled, mockSimulatedMetrics } from '@/simulation'
 
 export function DashboardPage() {
   const connection = useConnectionStore()
   const host = useSettingsStore((state) => state.connection.host)
   const events = useEventLogStore((state) => state.events)
-
-  const [simScan] = useState(() => (isSimulationEnabled ? generateMockLidarScan() : null))
 
   // Metrics: In simulation mode use mock; in real mode show null ("No data")
   const metrics = isSimulationEnabled ? mockSimulatedMetrics : null
@@ -182,32 +178,7 @@ export function DashboardPage() {
         </Card>
 
         {/* LiDAR Radar Preview Slot */}
-        <Card className="flex flex-col">
-          <CardHeader className="pb-3 flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <Radar className="h-4 w-4 text-primary" />
-                LiDAR Proximity Radar
-              </CardTitle>
-              <CardDescription className="text-xs">2D laser scan obstacle overview</CardDescription>
-            </div>
-            <Button
-              asChild
-              variant="ghost"
-              size="sm"
-              className="min-h-[44px] sm:min-h-[32px] text-xs"
-            >
-              <Link to="/lidar">Full Radar</Link>
-            </Button>
-          </CardHeader>
-          <CardContent className="flex-1 p-4">
-            <LidarCanvas
-              points={simScan?.points || []}
-              maxRangeMeters={8.0}
-              className="h-[240px] sm:h-[300px]"
-            />
-          </CardContent>
-        </Card>
+        <DashboardLidarCard />
       </div>
 
       {/* 4. Quick Actions & Local Activity */}

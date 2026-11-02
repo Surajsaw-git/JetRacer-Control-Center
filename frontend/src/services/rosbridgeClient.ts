@@ -15,9 +15,67 @@ import {
   assertOperationAllowed,
   assertServiceAllowed,
   assertCameraCompressedSubscriptionAllowed,
+  assertLidarSubscriptionAllowed,
   MIN_CAMERA_THROTTLE_MS,
+  MIN_LIDAR_THROTTLE_MS,
 } from '@/services/rosPolicy'
+import { sanitizeRosJson } from '@/services/lidar/scanDecoder'
 import type { ConnectionStatus, RosTimestamp } from '@/types'
+
+/**
+ * Installs transparent pre-parser hook for raw WebSocket text frames.
+ * Sanitizes bare `Infinity` and `NaN` produced by ROS 1 python json.dumps before standard JSON.parse.
+ */
+function installWebSocketSanitizer(): void {
+  if (typeof window === 'undefined' || !window.WebSocket) return
+  const OriginalWebSocket = window.WebSocket
+  if ((OriginalWebSocket as unknown as { __ros_sanitized?: boolean }).__ros_sanitized) return
+
+  class SanitizedWebSocket extends OriginalWebSocket {
+    static __ros_sanitized = true
+
+    set onmessage(handler: ((this: WebSocket, ev: MessageEvent) => unknown) | null) {
+      if (!handler) {
+        super.onmessage = null
+        return
+      }
+      super.onmessage = function (ev: MessageEvent) {
+        if (
+          typeof ev.data === 'string' &&
+          (ev.data.includes('Infinity') || ev.data.includes('NaN'))
+        ) {
+          const cleanData = sanitizeRosJson(ev.data)
+          try {
+            const cleanEv = new MessageEvent('message', {
+              data: cleanData,
+              origin: ev.origin,
+              lastEventId: ev.lastEventId,
+              source: ev.source,
+              ports: [...ev.ports],
+            })
+            return handler.call(this, cleanEv)
+          } catch {
+            try {
+              Object.defineProperty(ev, 'data', { value: cleanData, configurable: true })
+            } catch {
+              // Ignore if event object is frozen
+            }
+            return handler.call(this, ev)
+          }
+        }
+        return handler.call(this, ev)
+      }
+    }
+
+    get onmessage() {
+      return super.onmessage
+    }
+  }
+
+  window.WebSocket = SanitizedWebSocket as unknown as typeof WebSocket
+}
+
+installWebSocketSanitizer()
 
 /**
  * Lazy module loader for roslib to prevent bundle bloat in main chunk.
@@ -64,6 +122,7 @@ export class RosbridgeClient {
   private reconnectAttempts: number = 0
   private isIntentionalDisconnect: boolean = false
   private activeCameraSubscriptions: number = 0
+  private activeLidarSubscriptions: number = 0
   private stableConnectionTimer: ReturnType<typeof setTimeout> | null = null
 
   constructor(options?: RosbridgeClientOptions) {
@@ -624,6 +683,56 @@ export class RosbridgeClient {
 
   public getActiveCameraSubscriptionsCount(): number {
     return this.activeCameraSubscriptions
+  }
+
+  /**
+   * Controlled subscription for 2D LaserScan streams over rosbridge (Phase 6).
+   * Strictly enforces caller identity ('LidarService'), throttle floor (>=50ms), and single active subscription.
+   */
+  public async subscribeLaserScan(
+    topicName: string,
+    callback: (message: unknown) => void,
+    throttleRateMs: number = 100,
+    caller: string = 'LidarService',
+  ): Promise<() => void> {
+    assertLidarSubscriptionAllowed(
+      caller,
+      'sensor_msgs/LaserScan',
+      throttleRateMs,
+      this.activeLidarSubscriptions,
+    )
+
+    if (!this.ros || !this.ros.isConnected) {
+      throw new Error('Rosbridge socket is not connected.')
+    }
+
+    const { Topic } = await getRoslib()
+    const topic = new Topic({
+      ros: this.ros,
+      name: topicName,
+      messageType: 'sensor_msgs/LaserScan',
+      throttle_rate: Math.max(MIN_LIDAR_THROTTLE_MS, throttleRateMs),
+      queue_length: 1,
+    })
+
+    this.activeLidarSubscriptions++
+    topic.subscribe(callback)
+
+    let cleanedUp = false
+    return () => {
+      if (cleanedUp) return
+      cleanedUp = true
+      this.activeLidarSubscriptions = Math.max(0, this.activeLidarSubscriptions - 1)
+      try {
+        topic.unsubscribe(callback)
+      } catch {
+        // Safe teardown
+      }
+    }
+  }
+
+  public getActiveLidarSubscriptionsCount(): number {
+    return this.activeLidarSubscriptions
   }
 
   public getRosInstance(): Ros | null {
