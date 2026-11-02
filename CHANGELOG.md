@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.7.0] - 2026-11-02 (v0.7.0-phase6)
+
+### Added
+- **LiDAR Radar Canvas:** High-performance HTML5 2D Canvas polar radar visualizer with concentric range rings ($0.5\text{m}$ to $8.0\text{m}$), 30° radial markers, robot footprint outline, and pan/zoom interaction.
+- **Proximity Zones & Point Classification:** Classification into Danger ($\le 0.35\text{m}$, red), Caution ($\le 0.70\text{m}$, amber), and Clear ($> 0.70\text{m}$, emerald/cyan).
+- **Defensive ROS 1 Melodic Bare `Infinity`/`NaN` Parser:** Regex WebSocket pre-parser `sanitizeRosJson` in `rosbridgeClient.ts` to neutralize bare ECMAScript tokens before `JSON.parse()`.
+- **REP-103 Coordinate Geometry:** Standard ROS coordinate frame (+X forward, +Y left, CCW positive angle increment) with pre-calculated trigonometric sin/cos lookup tables.
+- **Orientation Calibration:** Chassis alignment controls with preset offsets ($0^\circ, 90^\circ, 180^\circ, 270^\circ$) and $\pm 5^\circ$ fine stepper adjustments.
+- **Ref-Counted Lidar Manager:** Singleton coordinator (`lidarManager`) sharing active subscription between LiDAR page and Dashboard card, with 2.0s stall detection, exponential backoff auto-reconnect, and 50-scan ring buffer JSON export.
+- **Status Panel & Sector Readouts:** Hardware profile inspector, 4-sector minimum distance readouts (Front, Left, Right, Rear), and point inspection crosshair reticle.
+- **Dashboard LiDAR Preview Card:** Dedicated live radar preview card on the Dashboard with explicit user start/stop preview control.
+- **Mock Server Extensions:** Synthetic 2D room scan generator and fault injection flags (`--lidar-inf-nan-bare`, `--lidar-stall`, `--lidar-flood`, etc.) in `mock-rosbridge/server.js`.
+- **Robot Diagnostics Script:** Read-only `robot/scripts/check_lidar.sh` reporting serial devices, dialout permissions, scan Hz, and range stats.
+- **Permanent Non-Safety Warning:** Prominent non-safety disclaimer banners across radar views.
+
+---
+
 ## [0.6.2] - 2026-11-02 (v0.6.2-field-fixes)
 
 ### Fixed

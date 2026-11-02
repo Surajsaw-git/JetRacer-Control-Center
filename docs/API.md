@@ -417,3 +417,45 @@ Profiles exported and imported via the System Registry tab:
   - Throttle floor $\ge 100\text{ ms}$ (max 10 Hz).
   - Raw `sensor_msgs/Image` is strictly blocked.
   - Latest-frame-wins drop policy prevents backpressure.
+
+---
+
+## 7. LiDAR Streaming Protocol (Phase 6)
+
+### 7.1 Rosbridge WebSocket `sensor_msgs/LaserScan` Transport
+- **Subscription Operation:**
+  ```json
+  {
+    "op": "subscribe",
+    "topic": "<laser_topic>",
+    "type": "sensor_msgs/LaserScan",
+    "throttle_rate": 100,
+    "queue_length": 1
+  }
+  ```
+- **Incoming Message Schema (`sensor_msgs/LaserScan`):**
+  ```json
+  {
+    "op": "publish",
+    "topic": "/scan",
+    "msg": {
+      "header": { "seq": 450, "stamp": { "secs": 1700000000, "nsecs": 0 }, "frame_id": "laser_frame" },
+      "angle_min": -3.14159,
+      "angle_max": 3.14159,
+      "angle_increment": 0.01745,
+      "time_increment": 0.0001,
+      "scan_time": 0.1,
+      "range_min": 0.15,
+      "range_max": 12.0,
+      "ranges": [1.25, null, 3.4, 0.28, 5.0],
+      "intensities": [100.0, 0.0, 150.0, 80.0, 200.0]
+    }
+  }
+  ```
+- **Safety & Policy Enforcement:**
+  - `MAX_LIDAR_SUBSCRIPTIONS = 1`: strictly 1 active subscription application-wide.
+  - `MIN_LIDAR_THROTTLE_MS = 50`: minimum throttle floor 50 ms (20 Hz max).
+  - `MAX_LIDAR_RANGES_LENGTH = 8192`: oversized packet rejection.
+  - Pre-deserialization regex sanitizes bare non-standard `Infinity` and `NaN` tokens to `null`.
+  - Watchdog triggers `stalled` state if no scan is received within 2.0 s.
+

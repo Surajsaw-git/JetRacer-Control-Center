@@ -192,6 +192,20 @@ bash start_camera.sh 8080
 
 ---
 
+### Step 8: Verify Phase 6 LiDAR Visualization
+
+On the Jetson Nano:
+1. Verify LiDAR serial device and topic:
+   ```bash
+   cd ~/jetracer-robot/scripts
+   bash check_lidar.sh
+   ```
+2. Verify `/scan` or active LaserScan topic is streaming at $\ge 5\text{ Hz}$.
+3. In Control Center UI, navigate to **LiDAR** and click **Start Stream**.
+4. Refer to [Phase 6 Robot Verification](file:///docs/PHASE6_ROBOT_VERIFICATION.md) for comprehensive verification instructions and non-safety guidance.
+
+---
+
 ## 7. Field Notes & Diagnostic Commands (From First Live Test, 2026-11-02)
 
 During the first live robot test over private Wi-Fi hotspot, several environmental conditions were observed (high load under SLAM + camera, variable latency 133ms–321ms, memory ~900MB free). Use these diagnostic commands if the link drops or latency spikes:

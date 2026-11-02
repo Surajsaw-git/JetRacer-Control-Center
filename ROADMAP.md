@@ -22,7 +22,7 @@
 | **3** | **IP Connection** | Two-link connection architecture (Link A rosbridge + Link B FastAPI), connection wizard with address parser/validator, exponential backoff with jitter, field testing runbook, and mock rosbridge. | **Done (Tested against local mock only, not tested on robot)** |
 | **4** | **ROS Integration** | ROS Master status detection with clock offset, rosapi discovery service with concurrency limit, controlled topic watcher (max 5 watches, heavy-type blocking, LaserScan reduction), user-confirmed topic registry, capability policy, and redacted inspection report export. | **Done (Tested against local mock rosbridge; not tested on robot)** |
 | **5** | **Camera** | Real-time video stream player (HTTP MJPEG + WebSocket Compressed fallback), 16:9 canvas letterbox rendering, ref-counted cameraManager, client-side snapshot capture, quality presets & auto-adaptation, stall detection with backoff, and robot setup runbook. | **Done (Mock-tested only; not tested on robot)** |
-| **6** | **LiDAR** | 2D LaserScan visualization, radial distance grids, collision zone alerts, and point filter settings. | Not started |
+| **6** | **LiDAR** | 2D LaserScan visualization (REP-103), Canvas radar grid, proximity zones & point classification, bare inf/nan JSON pre-parser, ref-counted LidarManager, stall watchdog & backoff, orientation stepper, and non-safety notices. | **Done (Mock-tested only; not tested on robot)** |
 | **7** | **Mapping** | Real-time SLAM occupancy grid streaming, SLAM node launch control, and `.yaml`/`.pgm` map file manager. | Not started |
 | **8** | **Manual Control** | Virtual on-screen joystick, keyboard bindings, speed limiters, steering trim calibration, and dead-man switch. | Not started |
 | **9** | **Autonomous Navigation** | 2D Nav Goal dispatch, waypoint sequence planner, robot pose tracker, and path execution monitor. | Not started |
@@ -311,7 +311,34 @@
 
 ---
 
-## 10. Reusable Progress Report Template (Copy after each phase)
+## 10. Phase 6 Progress Report: LiDAR Visualization
+
+- **Date Completed:** 2026-11-02
+- **Status:** **Done (Mock-tested only; not tested on robot hardware)**
+- **What Was Created / Modified:**
+  - **Rosbridge Serialization & Defensive Parsing:** Developed `sanitizeRosJson` in `frontend/src/services/rosbridgeClient.ts` to neutralize bare, non-standard ECMAScript `Infinity`, `-Infinity`, and `NaN` tokens emitted by ROS 1 Melodic rosbridge server into standard `null` values before `JSON.parse`.
+  - **Typed Scan Decoder & Classifications:** Float32Array-backed parser in `frontend/src/services/lidar/scanDecoder.ts` classifying rays into `VALID`, `OUT_OF_RANGE`, `TOO_CLOSE`, and `INVALID_OR_NAN`.
+  - **REP-103 Geometry & Trigonometric Cache:** `scanGeometry.ts` implementing ROS REP-103 standard (+X forward, +Y left, CCW positive angle increment), pre-allocated sin/cos cache, polar-to-Cartesian transforms, and 4-sector distance calculations.
+  - **Scan Processor & Streaming Watchdog:** `scanProcessor.ts` tracking publication Hz, bandwidth, frozen scan detection (14 consecutive identical comparisons), and frame_id change detection.
+  - **Ref-Counted Lidar Manager:** `lidarManager.ts` managing single application-wide subscription (`MAX_LIDAR_SUBSCRIPTIONS = 1`), stall watchdog (2.0s without scans -> `stalled`), exponential backoff auto-reconnect (1s, 2s, 4s, 8s, 16s with ±20% jitter), and 50-scan ring buffer JSON export.
+  - **Radar Canvas & Proximity UI:** `frontend/src/components/common/LidarCanvas.tsx` rendering high-DPI polar radar grid, danger ($\le 0.35\text{m}$), caution ($\le 0.70\text{m}$), and clear ($> 0.70\text{m}$) zones, robot footprint, point inspection crosshair reticle, and non-safety warning banner.
+  - **Lidar Page & Dashboard Card:** `pages/Lidar/LidarPage.tsx` with dynamic discovery dropdown, throttle rate selector (50ms, 100ms, 200ms, 500ms), orientation stepper ($0^\circ, 90^\circ, 180^\circ, 270^\circ$ and $\pm 5^\circ$), and `pages/Dashboard/DashboardLidarCard.tsx` live preview card.
+  - **Mock Server Extensions:** `tools/mock-rosbridge/server.js` generating synthetic 2D scans for `/mock_world/lidar_main/scan` and secondary scanner, room boundary walls + obstacle boxes, and CLI fault flags (`--lidar-inf-nan-bare`, `--lidar-stall`, `--lidar-flood`, etc.).
+  - **Robot Diagnostics Script:** `robot/scripts/check_lidar.sh` reporting `/dev/ttyUSB*`, `lsusb`, `dialout` group membership, topic Hz, and Python range statistics.
+- **Verification & Test Results:**
+  - **Vitest Frontend Tests:** 164 passed across 38 test files (including `lidarIntegration.test.ts`, `lidarManager.test.ts`, `lidarPolicy.test.ts`, `scanDecoder.test.ts`, `scanGeometry.test.ts`, `scanProcessor.test.ts`, and `LidarPage.test.tsx`).
+  - **TypeScript & Lint:** `tsc -b` passed with 0 errors, `eslint .` passed with 0 errors.
+  - **Production Build:** Vite built in 709ms, verified 0 mock strings in `dist/assets/*`.
+  - **Accessibility (axe-core):** 0 critical or serious violations on LidarPage.
+  - **Backend Tests:** 48 pytest passed, `ruff` passed, `mypy` passed across 37 source files.
+  - **Capacitor Android:** `npx cap sync android` completed in 0.255s.
+  - **Visual Capture:** 5 screenshots captured in `docs/screenshots/phase6/`.
+- **Hardware Verification:**
+  - **Mock-tested only; not tested on robot.** Real robot verification scheduled for next college hardware session.
+
+---
+
+## 11. Reusable Progress Report Template (Copy after each phase)
 
 ```markdown
 ### Phase X Progress Report: [Phase Title]

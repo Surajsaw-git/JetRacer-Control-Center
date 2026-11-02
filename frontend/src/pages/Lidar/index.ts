@@ -1,2 +1,2 @@
 export * from './LidarPage'
-export { default } from './LidarPage'
+export { LidarPage as default } from './LidarPage'

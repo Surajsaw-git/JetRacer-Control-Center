@@ -25,6 +25,16 @@ const flagCameraStall = args.includes('--camera-stall');
 const flagCameraFail = args.includes('--camera-fail');
 const flagCameraCorsBlock = args.includes('--camera-cors-block');
 
+// LiDAR fault injection flags
+const flagLidarInfNanBare = args.includes('--lidar-inf-nan-bare');
+const flagLidarInfNanStr = args.includes('--lidar-inf-nan-str');
+const flagLidarInfNanNull = args.includes('--lidar-inf-nan-null');
+const flagLidarStall = args.includes('--lidar-stall');
+const flagLidarFlood = args.includes('--lidar-flood');
+const flagLidarFrozen = args.includes('--lidar-frozen');
+const flagLidarAllInvalid = args.includes('--lidar-all-invalid');
+const flagLidarOversized = args.includes('--lidar-oversized');
+
 let artificialDelayMs = 0;
 const delayIndex = args.indexOf('--delay');
 if (delayIndex !== -1 && args[delayIndex + 1]) {
@@ -39,6 +49,8 @@ const HOST = process.env.MOCK_ROSBRIDGE_HOST || '127.0.0.1';
 const MOCK_TOPICS = [
   { name: '/mock_world/odom', type: 'nav_msgs/Odometry' },
   { name: '/mock_world/scan', type: 'sensor_msgs/LaserScan' },
+  { name: '/mock_world/lidar_main/scan', type: 'sensor_msgs/LaserScan' },
+  { name: '/mock_world/lidar_secondary/scan', type: 'sensor_msgs/LaserScan' },
   { name: '/mock_world/imu', type: 'sensor_msgs/Imu' },
   { name: '/mock_world/battery', type: 'sensor_msgs/BatteryState' },
   { name: '/mock_world/camera/image_raw', type: 'sensor_msgs/Image' },
@@ -48,6 +60,116 @@ const MOCK_TOPICS = [
   { name: '/mock_world/tf_static', type: 'tf2_msgs/TFMessage' },
   { name: '/mock_world/test_nan', type: 'sensor_msgs/Imu' },
 ];
+
+function generateSyntheticLaserScan(tick = 0, options = {}) {
+  const numRays = options.oversized ? 10000 : (options.numRays || 360);
+  const angleMin = -Math.PI;
+  const angleMax = Math.PI;
+  const angleIncrement = (angleMax - angleMin) / numRays;
+  const rangeMin = 0.15;
+  const rangeMax = 12.0;
+
+  const ranges = [];
+  const intensities = [];
+
+  // Effective tick: if frozen, tick is locked at 1
+  const effTick = options.frozen ? 1 : tick;
+
+  for (let i = 0; i < numRays; i++) {
+    if (options.allInvalid) {
+      ranges.push(null);
+      intensities.push(0);
+      continue;
+    }
+
+    const angle = angleMin + i * angleIncrement;
+    const cosA = Math.cos(angle);
+    const sinA = Math.sin(angle);
+
+    // Default ray range against 6x4m room: X in [-2, 3], Y in [-2, 2]
+    let dist = rangeMax + 1.0;
+
+    // Front wall X = 3.0
+    if (cosA > 0.001) {
+      const t = 3.0 / cosA;
+      const y = t * sinA;
+      if (y >= -2.0 && y <= 2.0 && t < dist) dist = t;
+    }
+    // Back wall X = -2.0
+    if (cosA < -0.001) {
+      const t = -2.0 / cosA;
+      const y = t * sinA;
+      if (y >= -2.0 && y <= 2.0 && t < dist) dist = t;
+    }
+    // Left wall Y = 2.0
+    if (sinA > 0.001) {
+      const t = 2.0 / sinA;
+      const x = t * cosA;
+      if (x >= -2.0 && x <= 3.0 && t < dist) dist = t;
+    }
+    // Right wall Y = -2.0
+    if (sinA < -0.001) {
+      const t = -2.0 / sinA;
+      const x = t * cosA;
+      if (x >= -2.0 && x <= 3.0 && t < dist) dist = t;
+    }
+
+    // Front obstacle at X = 1.5, Y = 0.0 (radius 0.2m)
+    // Ray from origin (0,0) towards (cosA, sinA)
+    // Distance from center (1.5, 0) to line: |1.5 * sinA|
+    if (cosA > 0 && Math.abs(1.5 * sinA) < 0.2) {
+      const obstDist = 1.5 * cosA - Math.sqrt(0.04 - (1.5 * sinA) ** 2);
+      if (obstDist > 0 && obstDist < dist) dist = obstDist;
+    }
+
+    // Left obstacle at X = 0.0, Y = 1.0 (radius 0.15m)
+    if (sinA > 0 && Math.abs(1.0 * cosA) < 0.15) {
+      const obstDist = 1.0 * sinA - Math.sqrt(0.0225 - (1.0 * cosA) ** 2);
+      if (obstDist > 0 && obstDist < dist) dist = obstDist;
+    }
+
+    // Dynamic wave variation
+    if (!options.frozen) {
+      dist += 0.05 * Math.sin(angle * 4 + effTick * 0.1);
+    }
+
+    // Format range value based on fault flags
+    if (i % 30 === 0 && (options.infNanBare || options.infNanStr || options.infNanNull)) {
+      if (options.infNanBare) {
+        // Will be replaced in raw JSON string with bare Infinity or NaN
+        ranges.push(i % 60 === 0 ? 888888.88 : 999999.99);
+      } else if (options.infNanStr) {
+        ranges.push(i % 60 === 0 ? "NaN" : "Infinity");
+      } else {
+        ranges.push(null);
+      }
+      intensities.push(0);
+    } else {
+      ranges.push(Number(dist.toFixed(3)));
+      intensities.push(Math.round(100 + 100 * Math.exp(-dist / 3)));
+    }
+  }
+
+  const nowSecs = Math.floor(Date.now() / 1000);
+  const nowNsecs = (Date.now() % 1000) * 1000000;
+
+  return {
+    header: {
+      seq: tick,
+      stamp: { secs: nowSecs, nsecs: nowNsecs },
+      frame_id: options.frameId || 'laser_frame',
+    },
+    angle_min: angleMin,
+    angle_max: angleMax,
+    angle_increment: angleIncrement,
+    time_increment: 0.00005,
+    scan_time: 0.1,
+    range_min: rangeMin,
+    range_max: rangeMax,
+    ranges,
+    intensities,
+  };
+}
 
 function generateSyntheticJpeg(width = 320, height = 240, tick = 0) {
   const frameData = Buffer.alloc(width * height * 4);
@@ -284,7 +406,18 @@ if (flagHang) {
           clearInterval(activePublishTimers.get(topic));
         }
 
-        const publishRateMs = flagFlood ? 20 : 200;
+        const isLidarTopic =
+          topic === '/mock_world/scan' ||
+          topic === '/mock_world/lidar_main/scan' ||
+          topic === '/mock_world/lidar_secondary/scan';
+
+        let publishRateMs = 200;
+        if (isLidarTopic) {
+          publishRateMs = flagLidarFlood ? 20 : (topic === '/mock_world/lidar_secondary/scan' ? 200 : 100);
+        } else if (flagFlood) {
+          publishRateMs = 20;
+        }
+
         let tick = 0;
 
         const timer = setInterval(() => {
@@ -295,6 +428,7 @@ if (flagHang) {
 
           tick++;
           let messageData = {};
+          let rawPayloadString = null;
 
           if (topic === '/mock_world/odom') {
             messageData = {
@@ -312,22 +446,31 @@ if (flagHang) {
                 },
               },
             };
-          } else if (topic === '/mock_world/scan') {
-            // Generate synthetic 360-degree laser scan
-            const ranges = [];
-            for (let i = 0; i < 360; i++) {
-              ranges.push(Number((1.5 + 0.3 * Math.sin((i * Math.PI) / 180 + tick * 0.1)).toFixed(2)));
+          } else if (isLidarTopic) {
+            if (flagLidarStall && tick > 5) {
+              return; // Stall simulation for LiDAR
             }
-            messageData = {
-              header: { seq: tick, stamp: { secs: Math.floor(Date.now() / 1000), nsecs: 0 }, frame_id: 'laser' },
-              angle_min: -3.14159,
-              angle_max: 3.14159,
-              angle_increment: 0.01745,
-              range_min: 0.15,
-              range_max: 12.0,
-              ranges,
-              intensities: [],
-            };
+            messageData = generateSyntheticLaserScan(tick, {
+              infNanBare: flagLidarInfNanBare,
+              infNanStr: flagLidarInfNanStr,
+              infNanNull: flagLidarInfNanNull,
+              frozen: flagLidarFrozen,
+              allInvalid: flagLidarAllInvalid,
+              oversized: flagLidarOversized,
+              frameId: topic === '/mock_world/lidar_secondary/scan' ? 'laser_aux_frame' : 'laser_frame',
+            });
+
+            if (flagLidarInfNanBare) {
+              const baseStr = JSON.stringify({
+                op: 'publish',
+                topic,
+                msg: messageData,
+              });
+              // Emulate bare ECMAScript tokens without quotation marks
+              rawPayloadString = baseStr
+                .replace(/888888\.88/g, 'NaN')
+                .replace(/999999\.99/g, 'Infinity');
+            }
           } else if (topic === '/mock_world/imu') {
             messageData = {
               linear_acceleration: { x: 0.02, y: -0.01, z: 9.81 },
@@ -363,13 +506,17 @@ if (flagHang) {
             messageData = { seq: tick, message: 'mock payload' };
           }
 
-          ws.send(
-            JSON.stringify({
-              op: 'publish',
-              topic,
-              msg: messageData,
-            }),
-          );
+          if (rawPayloadString) {
+            ws.send(rawPayloadString);
+          } else {
+            ws.send(
+              JSON.stringify({
+                op: 'publish',
+                topic,
+                msg: messageData,
+              }),
+            );
+          }
         }, publishRateMs);
 
         activePublishTimers.set(topic, timer);

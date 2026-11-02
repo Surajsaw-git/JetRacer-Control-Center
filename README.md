@@ -2,16 +2,17 @@
 
 JetRacer Control Center is a comprehensive, multi-platform robotics command and telemetry dashboard designed to control and monitor the NVIDIA JetRacer ROS AI Kit over a local Wi-Fi network. Running simultaneously as a responsive React web application, an installable Android mobile application (via Capacitor), and a desktop browser interface, it eliminates the need for direct SSH terminals or HDMI monitor connections during autonomous navigation, mapping, and driving experiments.
 
-> **PROJECT STATUS (PHASE 5 COMPLETED):**
-> Phase 5 Camera Module is complete:
-> - **Dual Transport Streamer:** Primary HTTP MJPEG streaming via `web_video_server` (Port 8080) with automatic fallback to rosbridge `sensor_msgs/CompressedImage` over WebSocket.
-> - **Evolved Video Viewport:** HTML5 Canvas rendering preserving 16:9 aspect ratio with black letterboxing, toggleable HUD (FPS, resolution, bandwidth, drop counter, latency), and Fullscreen API with Android back button popstate and Screen Wake Lock.
-> - **Camera Manager:** Singleton ref-counting coordinator (`cameraManager`) sharing a single underlying stream across Camera page, Dashboard preview, and Control cockpit. Halts stream when 0 consumers are active.
-> - **Quality Presets & Auto-Adaptation:** Low, Medium, High, Custom, and Auto modes with hysteresis controller (10s dwell time).
-> - **Client-Side Snapshots:** Instant PNG frame download with timestamped naming (`jetracer-snap-<timestamp>.png`).
-> - **Strict Read-Only Enforcement:** Zero publishing, zero parameter writing, raw `sensor_msgs/Image` blocked over WebSocket.
-> - **Robot Runbook:** Diagnostic and installation scripts in `robot/scripts/` (`check_camera.sh`, `install_camera_stack.sh`, `start_camera.sh`) and field verification guide in [`docs/PHASE5_ROBOT_VERIFICATION.md`](file:///d:/Project/JetRacer%20Control%20Center/docs/PHASE5_ROBOT_VERIFICATION.md).
-> - **TESTING STATUS:** Tested against extended local mock rosbridge + mock `web_video_server`. **NOT YET TESTED ON PHYSICAL ROBOT.** Real ROS topics remain **NOT YET INSPECTED** until college hardware visit.
+> **PROJECT STATUS (PHASE 6 COMPLETED):**
+> Phase 6 LiDAR Visualization is complete:
+> - **High-Performance 2D Planar Radar Canvas:** HTML5 Canvas polar radar rendering with concentric metric range rings ($0.5\text{m}$ to $8.0\text{m}$), 30° azimuth radials, robot footprint glyph (+X forward, +Y left), and pan/zoom interaction.
+> - **Proximity Zones & Point Classification:** Distance-colored points (Danger $\le 0.35\text{m}$, Caution $\le 0.70\text{m}$, Clear $> 0.70\text{m}$).
+> - **Permanent Non-Safety Notice:** Prominent non-safety disclaimer banner clarifying radar is a visual aid only, not an active collision avoidance system.
+> - **Defensive Decoding & Pre-Parsing:** WebSocket regex pre-parser sanitizes bare ECMAScript `Infinity`/`NaN` tokens emitted by ROS 1 Melodic rosbridge server into standard `null` values.
+> - **Interactive Reticle & Sector Readouts:** Touch/hover crosshair reticle inspecting point distance, angle, and $(x,y)$, alongside real-time 4-sector distance telemetry (Front, Left, Right, Rear).
+> - **Orientation Calibration & Alignment:** Preset offsets ($0^\circ, 90^\circ, 180^\circ, 270^\circ$) and $\pm 5^\circ$ fine steppers for chassis alignment.
+> - **Ref-Counted Lidar Manager:** Shared singleton (`lidarManager`) managing subscriptions across LiDAR page and Dashboard card, with watchdog stall detection (2.0s), exponential backoff auto-reconnect, and 50-scan ring buffer JSON export.
+> - **Robot Diagnostics Runbook:** `robot/scripts/check_lidar.sh` serial, dialout, and range diagnostics script and [`docs/PHASE6_ROBOT_VERIFICATION.md`](file:///d:/Project/JetRacer%20Control%20Center/docs/PHASE6_ROBOT_VERIFICATION.md).
+> - **TESTING STATUS:** Tested against extended local mock rosbridge. **NOT YET TESTED ON PHYSICAL ROBOT.** Real ROS topics remain **NOT YET INSPECTED** until college hardware visit.
 
 ---
 

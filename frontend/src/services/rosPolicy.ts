@@ -98,6 +98,21 @@ export const MAX_CAMERA_SUBSCRIPTIONS = 1
 export const MIN_CAMERA_THROTTLE_MS = 100
 
 /**
+ * Maximum concurrent LiDAR LaserScan subscriptions permitted over rosbridge (Phase 6).
+ */
+export const MAX_LIDAR_SUBSCRIPTIONS = 1
+
+/**
+ * Minimum throttle interval (ms) enforced on LiDAR subscriptions over rosbridge (max 20 Hz).
+ */
+export const MIN_LIDAR_THROTTLE_MS = 50
+
+/**
+ * Maximum points per LaserScan message permitted before dropping as oversized (safety cap).
+ */
+export const MAX_LIDAR_RANGES_LENGTH = 8192
+
+/**
  * Approved outbound HTTP endpoints for on-robot video streaming (web_video_server).
  */
 export const ALLOWED_HTTP_VIDEO_ENDPOINTS = [
@@ -224,6 +239,44 @@ export function assertCameraCompressedSubscriptionAllowed(
   if (activeCameraSubscriptions >= MAX_CAMERA_SUBSCRIPTIONS) {
     throw new Error(
       `[SECURITY VIOLATION] Maximum active camera subscriptions (${MAX_CAMERA_SUBSCRIPTIONS}) exceeded. Only one camera stream may run concurrently over rosbridge.`,
+    )
+  }
+}
+
+/**
+ * Validates that a LiDAR subscription to sensor_msgs/LaserScan satisfies all safety bounds (Phase 6):
+ * 1. Only invoked by the specialized LiDAR service ('LidarService')
+ * 2. Throttle rate >= 50ms (maximum 20 Hz)
+ * 3. Concurrent LiDAR subscriptions strictly <= 1
+ * 4. Message type must be exactly 'sensor_msgs/LaserScan'
+ */
+export function assertLidarSubscriptionAllowed(
+  caller: string,
+  messageType: string,
+  throttleRateMs: number,
+  activeLidarSubscriptions: number,
+): void {
+  if (messageType !== 'sensor_msgs/LaserScan') {
+    throw new Error(
+      `[SECURITY VIOLATION] LiDAR subscription requires "sensor_msgs/LaserScan", received "${messageType}".`,
+    )
+  }
+
+  if (caller !== 'LidarService') {
+    throw new Error(
+      `[SECURITY VIOLATION] Unauthorized caller "${caller}" attempted LiDAR subscription. Only LidarService is permitted.`,
+    )
+  }
+
+  if (throttleRateMs < MIN_LIDAR_THROTTLE_MS) {
+    throw new Error(
+      `[SECURITY VIOLATION] LiDAR throttle rate ${throttleRateMs}ms is below the minimum safety threshold (${MIN_LIDAR_THROTTLE_MS}ms).`,
+    )
+  }
+
+  if (activeLidarSubscriptions >= MAX_LIDAR_SUBSCRIPTIONS) {
+    throw new Error(
+      `[SECURITY VIOLATION] Maximum active LiDAR subscriptions (${MAX_LIDAR_SUBSCRIPTIONS}) exceeded. Only one LaserScan stream may run concurrently over rosbridge.`,
     )
   }
 }

@@ -139,8 +139,16 @@
 
 ### 3. LiDAR Radar (`/lidar`)
 - **Interactive `<LidarCanvas>`:** High-DPI canvas supporting pan and zoom via touch drag/pinch and mouse wheel.
-- **Radar Visuals:** Concentric metric range rings (0.5m, 1.0m, 2.0m, 5.0m), 30-degree radial angle markers, center robot glyph indicating forward heading.
-- **Controls Toolbar:** Zoom in/out/reset buttons, maximum range slider, point size slider, color-by-intensity toggle, and pause/resume button.
+- **Radar Visuals:** Concentric metric range rings (0.5m, 1.0m, 2.0m, 5.0m, 8.0m), 30-degree radial angle markers, center robot glyph indicating forward heading (+X forward, +Y left).
+- **Proximity Zones & Point Coloring:**
+  - Danger zone ($\le 0.35\text{ m}$): Red points and inner radius indicator.
+  - Caution zone ($0.35\text{--}0.70\text{ m}$): Amber points.
+  - Clear zone ($> 0.70\text{ m}$): Emerald/cyan points.
+- **Point Inspection Reticle:** Hover or touch inspection HUD displaying point range $r$, angle $\theta$, and Cartesian coordinates $(x, y)$.
+- **Status Panel:** Hardware scan parameters (angles, ranges, points/scan), 4-sector minimum distance readouts (Front, Left, Right, Rear), and scan JSON export.
+- **Orientation & Alignment Stepper:** Sensor mounting offset selector ($0^\circ, 90^\circ, 180^\circ, 270^\circ$) and $\pm 5^\circ$ fine steppers.
+- **Safety Disclaimer Banner:** Permanent, prominent notice declaring proximity detection is a visual aid only, not an active collision avoidance system.
+- **Controls Toolbar:** Topic selector, throttle rate selector (50ms, 100ms, 200ms, 500ms), Start/Stop stream toggle, and Freeze/Resume button.
 
 ### 4. Mapping & SLAM (`/mapping`)
 - **Map Viewport:** 2D occupancy grid view with pan/zoom controls.

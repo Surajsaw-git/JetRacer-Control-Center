@@ -304,4 +304,29 @@ Following the first live robot test at college, link drop resilience was hardene
 - Under high Jetson load (SLAM + camera + rosapi), rosbridge Python WebSocket server memory and event loop saturation can lead to connection drops.
 - Phase 13 will introduce server-side hardening: setting socket buffer limits, ping timeouts, and separating telemetry broadcast channels from critical RPC calls.
 
+---
+
+## 11. LiDAR Visualization Architecture (Phase 6 Foundation)
+
+```mermaid
+flowchart TD
+    WS["rosbridge WebSocket (ws://<jetson-ip>:9090)"] --> Pre["sanitizeRosJson (Neutralize bare Infinity/NaN)"]
+    Pre --> Client["rosbridgeClient.subscribeLaserScan()"]
+    Client --> LidarSvc["lidarService (Caller identity enforced)"]
+    LidarSvc --> Mgr["lidarManager (Ref-counted singleton coordinator)"]
+    Mgr --> Decoder["scanDecoder (Typed Float32Array / Uint8Array classification)"]
+    Decoder --> Geom["scanGeometry (REP-103: +X forward, +Y left, sin/cos table)"]
+    Geom --> Proc["scanProcessor (Frozen scan & frame_id change detection, Hz, Bandwidth)"]
+    Proc --> Canvas["LidarCanvas (HTML5 Canvas 2D Polar Radar, Reticle, Zones)"]
+    Proc --> Panel["LidarStatusPanel (Hardware profile, 4-sector proximity readouts)"]
+    Proc --> DashCard["DashboardLidarCard (Live preview radar)"]
+```
+
+### 11.1 Key Architectural Decisions
+- **Zero-Copy & Memory Safety:** Decoded ranges and Cartesian coordinates use typed arrays (`Float32Array`, `Uint8Array`) to prevent GC spikes at 10-20 Hz.
+- **REP-103 Coordinate Geometry:** ROS REP-103 (+X forward / up, +Y left, CCW positive angle increment) is strictly maintained. Configurable orientation offset ($0^\circ, 90^\circ, 180^\circ, 270^\circ$) permits sensor mounting alignment without altering robot TF.
+- **Watchdog & Auto-Recovery:** Missing scans for $> 2.0\text{ s}$ trigger `stalled` state, faintly preserving previous scan on canvas without clearing, followed by exponential backoff auto-reconnect.
+- **Non-Safety Labeling:** All proximity readings and radar displays are permanently labeled as visual aids, never an automated collision avoidance safety system.
+
+
 
