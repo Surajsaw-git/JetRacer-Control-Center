@@ -61,87 +61,73 @@ const defaultDisplayConfig: LidarDisplayConfig = {
 
 export const useLidarStore = create<LidarStoreState>()(
   persist(
-    (set, get) => {
-      // Wire manager state listener
-      lidarManager.onStateChange((state, error) => {
-        set({ streamState: state, streamError: error ?? null })
-      })
+    (set, get) => ({
+      streamState: lidarManager.currentState,
+      streamError: lidarManager.currentError,
+      selectedTopic: '',
+      throttleRateMs: 100,
+      autoStartOnMount: false,
 
-      lidarManager.onMetrics((metrics) => {
-        set({
-          metrics,
-          sectorReadouts: lidarManager.sectorReadouts,
+      displayConfig: defaultDisplayConfig,
+      dangerThresholdM: 0.5,
+      cautionThresholdM: 1.0,
+
+      metrics: lidarManager.metrics,
+      sectorReadouts: lidarManager.sectorReadouts,
+
+      setSelectedTopic: (topic) => {
+        set({ selectedTopic: topic })
+        lidarManager.setSelectedTopic(topic)
+      },
+
+      setThrottleRate: (rateMs) => {
+        set({ throttleRateMs: rateMs })
+        lidarManager.setThrottleRate(rateMs)
+      },
+
+      setAutoStartOnMount: (enabled) => set({ autoStartOnMount: enabled }),
+
+      updateDisplayConfig: (partial) => {
+        set((state) => {
+          const updated = { ...state.displayConfig, ...partial }
+          lidarManager.updateDisplayConfig(updated)
+          return { displayConfig: updated }
         })
-      })
+      },
 
-      return {
-        streamState: lidarManager.currentState,
-        streamError: lidarManager.currentError,
-        selectedTopic: '',
-        throttleRateMs: 100,
-        autoStartOnMount: false,
+      setThresholds: (dangerM, cautionM) =>
+        set({ dangerThresholdM: dangerM, cautionThresholdM: cautionM }),
 
-        displayConfig: defaultDisplayConfig,
-        dangerThresholdM: 0.5,
-        cautionThresholdM: 1.0,
+      setRotationDeg: (deg) => {
+        get().updateDisplayConfig({ rotationDeg: deg })
+      },
 
-        metrics: lidarManager.metrics,
-        sectorReadouts: lidarManager.sectorReadouts,
+      toggleMirror: () => {
+        get().updateDisplayConfig({ mirror: !get().displayConfig.mirror })
+      },
 
-        setSelectedTopic: (topic) => {
-          set({ selectedTopic: topic })
+      startStream: async () => {
+        const topic = get().selectedTopic
+        if (topic) {
           lidarManager.setSelectedTopic(topic)
-        },
+        }
+        await lidarManager.startStream()
+      },
 
-        setThrottleRate: (rateMs) => {
-          set({ throttleRateMs: rateMs })
-          lidarManager.setThrottleRate(rateMs)
-        },
+      stopStream: () => {
+        lidarManager.stopStream()
+      },
 
-        setAutoStartOnMount: (enabled) => set({ autoStartOnMount: enabled }),
-
-        updateDisplayConfig: (partial) => {
-          set((state) => {
-            const updated = { ...state.displayConfig, ...partial }
-            lidarManager.updateDisplayConfig(updated)
-            return { displayConfig: updated }
-          })
-        },
-
-        setThresholds: (dangerM, cautionM) =>
-          set({ dangerThresholdM: dangerM, cautionThresholdM: cautionM }),
-
-        setRotationDeg: (deg) => {
-          get().updateDisplayConfig({ rotationDeg: deg })
-        },
-
-        toggleMirror: () => {
-          get().updateDisplayConfig({ mirror: !get().displayConfig.mirror })
-        },
-
-        startStream: async () => {
-          const topic = get().selectedTopic
-          if (topic) {
-            lidarManager.setSelectedTopic(topic)
-          }
-          await lidarManager.startStream()
-        },
-
-        stopStream: () => {
-          lidarManager.stopStream()
-        },
-
-        resetToDefaults: () => {
-          set({
-            displayConfig: defaultDisplayConfig,
-            throttleRateMs: 100,
-            dangerThresholdM: 0.5,
-            cautionThresholdM: 1.0,
-          })
-          lidarManager.updateDisplayConfig(defaultDisplayConfig)
-        },
-      }
-    },
+      resetToDefaults: () => {
+        set({
+          displayConfig: defaultDisplayConfig,
+          throttleRateMs: 100,
+          dangerThresholdM: 0.5,
+          cautionThresholdM: 1.0,
+        })
+        lidarManager.updateDisplayConfig(defaultDisplayConfig)
+      },
+    }),
     {
       name: 'jetracer_lidar_settings_v1',
       partialize: (state) => ({
@@ -155,3 +141,15 @@ export const useLidarStore = create<LidarStoreState>()(
     },
   ),
 )
+
+// Wire manager listeners safely outside the creator function so initial state is never clobbered
+lidarManager.onStateChange((state, error) => {
+  useLidarStore.setState({ streamState: state, streamError: error ?? null })
+})
+
+lidarManager.onMetrics((metrics) => {
+  useLidarStore.setState({
+    metrics,
+    sectorReadouts: lidarManager.sectorReadouts,
+  })
+})

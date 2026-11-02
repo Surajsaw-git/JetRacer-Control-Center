@@ -135,8 +135,10 @@ export function LidarPage() {
       return
     }
     setIsStarting(true)
-    setStoredTopic(activeTopic)
     try {
+      if (typeof setStoredTopic === 'function') {
+        setStoredTopic(activeTopic)
+      }
       toast.info(`Starting LiDAR stream on ${activeTopic}...`)
       await lidarManager.start('LidarPage', activeTopic, throttleRateMs)
     } catch (err) {
