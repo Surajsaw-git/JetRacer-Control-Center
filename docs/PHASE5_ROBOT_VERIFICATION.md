@@ -13,10 +13,13 @@
    - The Control Center subscribes to image feeds or requests HTTP MJPEG streams.
    - It **never publishes** to `/cmd_vel` or any robot control topic.
    - It **never alters** camera parameters, exposure, white balance, or `dynamic_reconfigure`.
+   - **Verification:** Confirm the app published nothing (`rostopic info /cmd_vel` publisher count remains strictly unchanged).
 2. **Bandwidth & CPU Preservation:**
    - Raw `sensor_msgs/Image` is **never transmitted** over rosbridge WebSocket JSON (would overwhelm the Jetson Nano CPU).
    - Only HTTP MJPEG (`web_video_server`) or `sensor_msgs/CompressedImage` (throttled $\ge 100\text{ ms}$, max 1 stream) are permitted.
    - Single ref-counted consumer manager ensures stream halts when not actively viewed.
+3. **SLAM Concurrency Restriction:**
+   - **SLAM must NOT be running during the first camera test.** Running GStreamer CSI encoding and web_video_server concurrently with SLAM (Gmapping/Cartographer) under 4GB RAM on the Jetson Nano can exhaust system memory. Keep SLAM stopped until standalone camera performance is benchmarked.
 
 ---
 

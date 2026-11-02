@@ -87,17 +87,28 @@ export class CameraManager {
         ...QUALITY_PRESETS.medium,
       }
     } else if (preset === 'custom' && customConfig) {
+      // Never request more than measured native resolution or 20 fps
+      const maxW = this.currentMetrics.width > 0 ? this.currentMetrics.width : 640
+      const maxH = this.currentMetrics.height > 0 ? this.currentMetrics.height : 480
+      const maxFps = this.currentMetrics.fps > 0 ? Math.min(20, Math.ceil(this.currentMetrics.fps)) : 20
       this.qualityConfig = {
         preset: 'custom',
-        width: customConfig.width ?? 640,
-        height: customConfig.height ?? 480,
-        fps: customConfig.fps ?? 20,
+        width: Math.min(customConfig.width ?? maxW, maxW),
+        height: Math.min(customConfig.height ?? maxH, maxH),
+        fps: Math.min(customConfig.fps ?? maxFps, maxFps),
         quality: customConfig.quality ?? 70,
       }
     } else if (preset in QUALITY_PRESETS) {
+      const p = QUALITY_PRESETS[preset as 'low' | 'medium' | 'high']
+      // For high (native scale 1.0): do not specify width/height so web_video_server provides native resolution without upscaling
+      const w = p.scale === 1.0 ? undefined : (this.currentMetrics.width > 0 ? Math.round(this.currentMetrics.width * p.scale) : p.width)
+      const h = p.scale === 1.0 ? undefined : (this.currentMetrics.height > 0 ? Math.round(this.currentMetrics.height * p.scale) : p.height)
       this.qualityConfig = {
         preset,
-        ...QUALITY_PRESETS[preset as 'low' | 'medium' | 'high'],
+        width: w,
+        height: h,
+        fps: p.fps,
+        quality: p.quality,
       }
     }
 
@@ -324,10 +335,15 @@ export class CameraManager {
   }
 
   private applyAutoStep(level: 'low' | 'medium' | 'high'): void {
-    const preset = QUALITY_PRESETS[level]
+    const p = QUALITY_PRESETS[level]
+    const w = p.scale === 1.0 ? undefined : (this.currentMetrics.width > 0 ? Math.round(this.currentMetrics.width * p.scale) : p.width)
+    const h = p.scale === 1.0 ? undefined : (this.currentMetrics.height > 0 ? Math.round(this.currentMetrics.height * p.scale) : p.height)
     this.qualityConfig = {
       preset: 'auto',
-      ...preset,
+      width: w,
+      height: h,
+      fps: p.fps,
+      quality: p.quality,
     }
     if (this.activeSource) {
       this.activeSource.updateConfig(this.qualityConfig)
