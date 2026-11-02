@@ -20,6 +20,7 @@ import {
   MIN_LIDAR_THROTTLE_MS,
 } from '@/services/rosPolicy'
 import { sanitizeRosJson } from '@/services/lidar/scanDecoder'
+import { rosDiscoveryService } from '@/services/rosDiscoveryService'
 import type { ConnectionStatus, RosTimestamp } from '@/types'
 
 /**
@@ -51,7 +52,7 @@ function installWebSocketSanitizer(): void {
               origin: ev.origin,
               lastEventId: ev.lastEventId,
               source: ev.source,
-              ports: [...ev.ports],
+              ports: ev.ports ? [...ev.ports] : undefined,
             })
             return handler.call(this, cleanEv)
           } catch {
@@ -308,6 +309,9 @@ export class RosbridgeClient {
               if (this.options.probeBackend) {
                 this.probeBackendHealth().catch(() => {})
               }
+
+              // Run discovery pass immediately upon connection
+              rosDiscoveryService.discoverAll().catch(() => {})
 
               resolve(true)
             } else {

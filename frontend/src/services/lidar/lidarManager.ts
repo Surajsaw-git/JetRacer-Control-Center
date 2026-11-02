@@ -90,8 +90,9 @@ export class LidarManager {
   }
 
   public setSelectedTopic(topic: string): void {
-    if (this.selectedTopic === topic) return
-    this.selectedTopic = topic.trim()
+    const clean = topic.trim()
+    if (this.selectedTopic === clean) return
+    this.selectedTopic = clean
 
     if (!this.selectedTopic) {
       this.transitionTo('no_topic')
@@ -99,10 +100,8 @@ export class LidarManager {
       return
     }
 
-    if (this.activeConsumers.size > 0 && !this.isUserStopped) {
-      this.restartStream()
-    } else {
-      this.transitionTo('stopped')
+    if ((this.currentState === 'streaming' || this.currentState === 'waiting') && !this.isUserStopped) {
+      this.restartStream().catch(() => {})
     }
   }
 
@@ -134,19 +133,6 @@ export class LidarManager {
       this.activeConsumers.set(consumerId, onScan)
     } else {
       this.activeConsumers.set(consumerId, () => {})
-    }
-
-    // Never auto-start on mount unless user explicitly initiated or stream was active
-    if (
-      this.activeConsumers.size === 1 &&
-      !this.isUserStopped &&
-      this.selectedTopic &&
-      this.currentState !== 'streaming' &&
-      this.currentState !== 'waiting'
-    ) {
-      if (useConnectionStore.getState().status === 'connected') {
-        this.startStream().catch(() => {})
-      }
     }
 
     return () => {
@@ -484,6 +470,10 @@ export class LidarManager {
     return this.currentState
   }
 
+  public getError(): string | null {
+    return this.currentError
+  }
+
   public getCurrentScan(): DecodedLaserScan | null {
     return this.latestScan
   }
@@ -501,8 +491,8 @@ export class LidarManager {
   }
 
   public async start(consumerId: string, topic: string, throttleRateMs = 100): Promise<boolean> {
-    this.setSelectedTopic(topic)
-    this.setThrottleRate(throttleRateMs)
+    this.selectedTopic = topic.trim()
+    this.throttleRateMs = Math.max(50, Math.min(1000, throttleRateMs))
     if (!this.activeConsumers.has(consumerId)) {
       this.attachConsumer(consumerId)
     }

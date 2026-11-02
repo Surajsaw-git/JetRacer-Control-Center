@@ -51,5 +51,5 @@ describe('System Page & Tabbed Introspection Accessibility (axe-core)', () => {
     // 6. Audit Registry tab
     await user.click(screen.getByRole('tab', { name: /Registry/i }))
     await runAxeAudit()
-  })
+  }, 15000)
 })

@@ -27,6 +27,7 @@ import { useLidarStore } from '@/store/lidarStore'
 import { useRosDiscoveryStore } from '@/store/rosDiscoveryStore'
 import { topicRegistry } from '@/services/topicRegistry'
 import { useConnectionStore } from '@/store/connectionStore'
+import { rosDiscoveryService } from '@/services/rosDiscoveryService'
 import type { DecodedScan, LidarMetrics, LidarSectorReadouts, LidarStreamState } from '@/services/lidar/lidarTypes'
 import { DEFAULT_LIDAR_CONFIG } from '@/services/lidar/lidarTypes'
 
@@ -54,14 +55,31 @@ export function LidarPage() {
 
   // Stream state & current scan from lidarManager
   const [streamState, setStreamState] = useState<LidarStreamState>(lidarManager.getState())
+  const [streamError, setStreamError] = useState<string | null>(lidarManager.getError())
   const [currentScan, setCurrentScan] = useState<DecodedScan | null>(lidarManager.getCurrentScan())
   const [metrics, setMetrics] = useState<LidarMetrics>(lidarManager.getMetrics())
   const [sectors, setSectors] = useState<LidarSectorReadouts | null>(lidarManager.getSectors())
   const [isPaused, setIsPaused] = useState<boolean>(false)
 
   const refreshTopics = () => {
-    // Topics are reactively bound to useRosDiscoveryStore
+    rosDiscoveryService.discoverAll().catch(() => {})
   }
+
+  // Trigger topic discovery on mount or when ROS connection connects
+  useEffect(() => {
+    if (isRosConnected && discoveredTopics.length === 0) {
+      rosDiscoveryService.discoverAll().catch(() => {})
+    }
+  }, [isRosConnected, discoveredTopics.length])
+
+  // Attach state error listener to lidarManager
+  useEffect(() => {
+    const unsubState = lidarManager.onStateChange((state, error) => {
+      setStreamState(state)
+      setStreamError(error ?? null)
+    })
+    return unsubState
+  }, [])
 
   // Attach listener to lidarManager for real-time state & scans
   useEffect(() => {
@@ -107,7 +125,11 @@ export function LidarPage() {
   const handleStartStream = async () => {
     if (!activeTopic) return
     setStoredTopic(activeTopic)
-    await lidarManager.start('LidarPage', activeTopic, throttleRateMs)
+    try {
+      await lidarManager.start('LidarPage', activeTopic, throttleRateMs)
+    } catch (err) {
+      console.error('[LidarPage] Error starting stream:', err)
+    }
   }
 
   const handleStopStream = () => {
@@ -268,6 +290,17 @@ export function LidarPage() {
               Verify that the LiDAR node (e.g. RPLIDAR, YDLIDAR, or mock server) is running on the robot.
               You can also type a topic name manually into the input field above.
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Stream Error Alert Banner */}
+      {streamError && streamState === 'error' && (
+        <div className="p-4 rounded-xl bg-rose-950/50 border border-rose-600/40 flex items-start gap-3 text-rose-300 text-xs">
+          <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <span className="font-semibold text-sm">LiDAR Stream Error</span>
+            <p className="text-rose-200/90">{streamError}</p>
           </div>
         </div>
       )}
