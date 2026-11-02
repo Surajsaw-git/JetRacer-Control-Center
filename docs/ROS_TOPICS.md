@@ -47,17 +47,47 @@ bash robot/scripts/check_camera.sh
 
 ## 2. Topic Registry
 
-| Topic Name | Message Type | Direction | Subsystem / Purpose | Verified on Robot |
-| :--- | :--- | :--- | :--- | :---: |
-| *To be discovered* | *NOT YET INSPECTED* | *N/A* | *N/A* | ❌ No |
+> Verified from live robot inspection on **2026-11-02 13:28:23 +0530** (`collect_ros_info.sh`, ROS 1 Melodic on Jetson Nano).
+
+| Topic Name | Message Type | Publishers | Subscribers | Measured Rate | Subsystem / Role | Verified on Robot |
+| :--- | :--- | :---: | :---: | :---: | :--- | :---: |
+| `/scan` | `sensor_msgs/LaserScan` | 1 (`/rplidarNode`) | 0 | 8.007 Hz | 2D LiDAR Scanner (`laser_scan` role) | ✅ Yes |
+| `/odom` | `nav_msgs/Odometry` | 1 | 0 | 25.040 Hz | Filtered Odometry (`odometry` role) | ✅ Yes |
+| `/odom_raw` | `nav_msgs/Odometry` | 1 | 1 | 49.964 Hz | Raw Wheel Encoder Odometry | ✅ Yes |
+| `/odom_combined` | `geometry_msgs/PoseWithCovarianceStamped` | 1 | 0 | - | EKF Fused Pose Estimate | ✅ Yes |
+| `/imu` | `sensor_msgs/Imu` | 1 | 1 | 49.975 Hz | Inertial Measurement Unit (`imu` role) | ✅ Yes |
+| `/cmd_vel` | `geometry_msgs/Twist` | 1 | 1 | 20.008 Hz | Teleop / Drive Commands (Phase 8) | ✅ Yes |
+| `/motor/rvel` | `std_msgs/Int32` | 1 | 0 | 49.956 Hz | Right Motor Measured Velocity | ✅ Yes |
+| `/motor/lvel` | `std_msgs/Int32` | 1 | 0 | 49.945 Hz | Left Motor Measured Velocity | ✅ Yes |
+| `/motor/rset` | `std_msgs/Int32` | 1 | 1 | 49.957 Hz | Right Motor Commanded Target | ✅ Yes |
+| `/motor/lset` | `std_msgs/Int32` | 1 | 1 | 49.975 Hz | Left Motor Commanded Target | ✅ Yes |
+| `/tf` | `tf2_msgs/TFMessage` | 4 | 0 | 123.521 Hz | Dynamic Coordinate Transforms | ✅ Yes |
+| `/joy` | `sensor_msgs/Joy` | 1 | 1 | 19.937 Hz | Gamepad Controller Input | ✅ Yes |
+| `/connected_clients` | `rosbridge_msgs/ConnectedClients` | 1 | 0 | - | Rosbridge Client Connection Monitor | ✅ Yes |
+| `/diagnostics` | `diagnostic_msgs/DiagnosticArray` | 1 | 0 | - | System & Motor Diagnostics | ✅ Yes |
+| `/rosout` | `rosgraph_msgs/Log` | 10 | 1 | 141.537 Hz | Standard ROS Log Stream | ✅ Yes |
+| `/rosout_agg` | `rosgraph_msgs/Log` | 1 | 0 | - | Aggregated ROS Log Stream | ✅ Yes |
+| `/map` | `nav_msgs/OccupancyGrid` | 0 | 0 | - | 2D Occupancy Grid (Active when SLAM launched) | ⏳ Expected in Phase 7 |
 
 ---
 
-## 3. Service Registry
+## 3. Node Registry
 
-| Service Name | Service Type | Direction | Subsystem / Purpose | Verified on Robot |
-| :--- | :--- | :--- | :--- | :---: |
-| *To be discovered* | *NOT YET INSPECTED* | *N/A* | *N/A* | ❌ No |
+> Verified from live robot inspection on **2026-11-02 13:28:23 +0530**.
+
+| Node Name | Package / Purpose | Verified on Robot |
+| :--- | :--- | :---: |
+| `/base_footprint_to_imu` | Static transform broadcaster (`base_footprint` -> IMU frame) | ✅ Yes |
+| `/base_footprint_to_laser` | Static transform broadcaster (`base_footprint` -> `laser_frame`) | ✅ Yes |
+| `/jetracer` | Waveshare JetRacer base hardware controller & motor driver | ✅ Yes |
+| `/joy_node` | Linux joystick driver node | ✅ Yes |
+| `/joy_teleop` | Joy to `/cmd_vel` teleoperation mapping node | ✅ Yes |
+| `/odom_ekf_node` | Odometry EKF integration node | ✅ Yes |
+| `/robot_pose_ekf` | Robot pose EKF fusion filter | ✅ Yes |
+| `/rosapi` | ROS runtime introspection service provider | ✅ Yes |
+| `/rosbridge_websocket` | Rosbridge JSON WebSocket server (port 9090) | ✅ Yes |
+| `/rosout` | Core ROS logging daemon | ✅ Yes |
+| `/rplidarNode` | RPLIDAR A1/A2 driver broadcasting `/scan` at 8.0 Hz | ✅ Yes |
 
 ---
 

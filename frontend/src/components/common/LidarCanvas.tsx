@@ -659,7 +659,7 @@ function drawRobotFootprint(ctx: CanvasRenderingContext2D, cx: number, cy: numbe
   ctx.save()
   ctx.translate(cx, cy)
 
-  // Robot chassis rectangle (centered on base_link/laser frame)
+  // Robot chassis rectangle (centered on robot origin / sensor origin)
   ctx.fillStyle = 'rgba(59, 130, 246, 0.2)'
   ctx.strokeStyle = '#3b82f6'
   ctx.lineWidth = 1.5

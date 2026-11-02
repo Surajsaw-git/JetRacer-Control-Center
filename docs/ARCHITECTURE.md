@@ -302,7 +302,8 @@ Following the first live robot test at college, link drop resilience was hardene
 
 ### 10.2 Open Architecture Item: Server-Side Hardening of rosbridge (Phase 13)
 - Under high Jetson load (SLAM + camera + rosapi), rosbridge Python WebSocket server memory and event loop saturation can lead to connection drops.
-- Phase 13 will introduce server-side hardening: setting socket buffer limits, ping timeouts, and separating telemetry broadcast channels from critical RPC calls.
+- **Observed Robot Configuration (Field Test 2026-11-02):** `rosbridge_websocket` currently runs on the physical robot with **no authentication** and all globs configured to wildcards (`topics_glob: [*]`, `services_glob: [*]`, `params_glob: [*]`).
+- Phase 13 will introduce server-side hardening: enforcing topic/service/param allowlists (`topics_glob`, `services_glob`), JWT token authentication, setting socket buffer limits, ping timeouts, and separating telemetry broadcast channels from critical RPC calls.
 
 ---
 
