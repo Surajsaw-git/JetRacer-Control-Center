@@ -26,13 +26,15 @@
 
 | Component | Value | Source & Verification Tag | Notes |
 | :--- | :--- | :--- | :--- |
-| **OS Distribution** | Ubuntu 18.04.6 LTS (Bionic Beaver, arm64) | `[CONFIRMED in log]` | Standard NVIDIA L4T rootfs |
+| **OS Distribution** | Ubuntu 18.04.6 LTS (Bionic Beaver, arm64) | `[VERIFIED 2026-11-02]` | Standard NVIDIA L4T rootfs |
 | **NVIDIA JetPack** | JetPack 4.6.5 (L4T R32.7.5) | `[CONFIRMED in log]` | Built 11 June 2024 |
-| **Linux Kernel** | `4.9.337-tegra` | `[CONFIRMED in log]` | NVIDIA Tegra kernel |
-| **System Python 3** | Expected `Python 3.6.x` | `[UNVERIFIED: To be confirmed by preflight.sh]` | Standard for Ubuntu 18.04 Bionic |
-| **ROS 1 Distribution** | ROS 1 Melodic Morenia (`melodic`) | `[CONFIRMED in log]` | Standard for Ubuntu 18.04 |
-| **Workspace Path** | `~/catkin_ws` | `[CONFIRMED in log]` | Source overlay workspace on `mmcblk1` |
-| **Vendor ROS Package** | `jetracer_ros` | `[CONFIRMED in log]` | Waveshare driver nodes, EKF odometry, teleop |
+| **Linux Kernel** | `4.9.337-tegra` | `[VERIFIED 2026-11-02]` | NVIDIA Tegra kernel reported by `uname -r` |
+| **System Python** | Python 3.6.9 & Python 2.7.17 | `[VERIFIED 2026-11-02]` | ROS Melodic `rospy` runs on Python 2.7 |
+| **ROS 1 Distribution** | ROS 1 Melodic Morenia (`melodic`) | `[VERIFIED 2026-11-02]` | Responsive at `http://localhost:11311` |
+| **Workspace Path** | `~/catkin_ws` | `[VERIFIED 2026-11-02]` | Source overlay workspace |
+| **Vendor ROS Package** | `jetracer_ros` | `[VERIFIED 2026-11-02]` | Waveshare driver nodes, EKF odometry, teleop |
+| **Rosbridge Server** | `rosbridge_websocket` (port 9090) | `[VERIFIED 2026-11-02]` | Unauthenticated, all globs `[*]` |
+| **Active LiDAR Node** | `/rplidarNode` | `[VERIFIED 2026-11-02]` | Emitting `/scan` at 8.007 Hz |
 
 ---
 
