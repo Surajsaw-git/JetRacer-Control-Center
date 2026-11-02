@@ -129,8 +129,8 @@ export function RootLayout() {
           {/* Sidebar Footer */}
           {!isSidebarCollapsed && (
             <div className="p-3 border-t border-border text-[11px] text-muted-foreground flex justify-between items-center">
-              <span>JetRacer v0.2.0</span>
-              <span className="font-mono">Phase 1 UI</span>
+              <span>JetRacer v0.6.2</span>
+              <span className="font-mono">Phase 5 Integration</span>
             </div>
           )}
         </aside>

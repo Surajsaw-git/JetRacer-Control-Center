@@ -64,6 +64,7 @@ export class RosbridgeClient {
   private reconnectAttempts: number = 0
   private isIntentionalDisconnect: boolean = false
   private activeCameraSubscriptions: number = 0
+  private stableConnectionTimer: ReturnType<typeof setTimeout> | null = null
 
   constructor(options?: RosbridgeClientOptions) {
     this.options = {
@@ -151,7 +152,27 @@ export class RosbridgeClient {
     this.reconnectAttempts = 0
     this.consecutiveFailedHeartbeats = 0
     this.transitionTo('disconnected', null)
-    useConnectionStore.getState().setDisconnected()
+  }
+
+  /**
+   * Stops active reconnect attempts immediately and permanently sets disconnected status.
+   */
+  public stopReconnecting(): void {
+    this.isIntentionalDisconnect = true
+    this.clearAllTimers()
+
+    if (this.ros) {
+      try {
+        this.ros.close()
+      } catch {
+        // Ignore
+      }
+      this.ros = null
+    }
+
+    this.reconnectAttempts = 0
+    this.consecutiveFailedHeartbeats = 0
+    this.transitionTo('disconnected', 'Reconnection stopped by user.')
   }
 
   /**
@@ -188,8 +209,13 @@ export class RosbridgeClient {
           } catch {
             // Ignore
           }
-          const timeoutMsg = `Timed out connecting to ${this.host}:${this.rosbridgePort}. Are you on the same Wi-Fi? Can you ping the robot?`
-          this.transitionTo('error', timeoutMsg)
+          this.isIntentionalDisconnect = false
+          const timeoutMsg = `Timed out connecting to rosbridge at ${this.host}:${this.rosbridgePort}. Are you on the same Wi-Fi? Can you ping the robot?`
+          if (this.status === 'reconnecting') {
+            this.handleUnexpectedDrop()
+          } else {
+            this.transitionTo('error', timeoutMsg)
+          }
           resolve(false)
         }
       }, this.options.connectTimeoutMs)
@@ -208,7 +234,6 @@ export class RosbridgeClient {
         this.probeRosTime()
           .then((success) => {
             if (success) {
-              this.reconnectAttempts = 0
               this.consecutiveFailedHeartbeats = 0
               this.transitionTo('connected')
 
@@ -252,8 +277,12 @@ export class RosbridgeClient {
           this.connectTimer = null
         }
 
-        const errorMsg = `Cannot reach robot at ${this.host}:${this.rosbridgePort}. Is rosbridge running? (See runbook)`
-        this.transitionTo('error', errorMsg)
+        const errorMsg = `Cannot reach rosbridge at ${this.host}:${this.rosbridgePort}. Is rosbridge running? (See runbook)`
+        if (this.status === 'reconnecting') {
+          this.handleUnexpectedDrop()
+        } else {
+          this.transitionTo('error', errorMsg)
+        }
         resolve(false)
       })
 
@@ -268,13 +297,13 @@ export class RosbridgeClient {
           return
         }
 
-        if (this.status === 'connected') {
+        if (this.status === 'connected' || this.status === 'reconnecting') {
           this.handleUnexpectedDrop()
         } else if (!hasSettled) {
           hasSettled = true
           this.transitionTo(
             'error',
-            `Connection closed by remote host ${this.host}:${this.rosbridgePort}.`,
+            `Cannot reach rosbridge at ${this.host}:${this.rosbridgePort}.`,
           )
           resolve(false)
         }
@@ -320,7 +349,7 @@ export class RosbridgeClient {
               : null
 
             useConnectionStore.getState().setHeartbeat(latency, rosTime)
-            useRosStatusStore.getState().updateHeartbeat(latency, rosTime)
+            useRosStatusStore.getState().updateHeartbeat(latency, rosTime, startTime)
             resolve(true)
           },
           (_err: unknown) => {
@@ -370,7 +399,7 @@ export class RosbridgeClient {
    * Handles lost connection with exponential backoff and jitter.
    */
   private handleUnexpectedDrop(): void {
-    if (this.isIntentionalDisconnect || this.status === 'reconnecting') {
+    if (this.isIntentionalDisconnect) {
       return
     }
 
@@ -388,36 +417,52 @@ export class RosbridgeClient {
   }
 
   private scheduleReconnect(): void {
-    if (this.reconnectAttempts >= this.options.maxReconnectAttempts) {
-      const msg = `Reconnection attempts exhausted (${this.options.maxReconnectAttempts}/${this.options.maxReconnectAttempts}). Check robot power, Wi-Fi, and rosbridge server.`
-      this.transitionTo('disconnected', msg)
-      useConnectionStore.getState().setDisconnected(msg)
+    if (this.isIntentionalDisconnect) {
       return
+    }
+
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = null
     }
 
     this.reconnectAttempts += 1
     this.transitionTo('reconnecting', null)
     useConnectionStore
       .getState()
-      .setReconnecting(this.reconnectAttempts, this.options.maxReconnectAttempts)
+      .setReconnecting(this.reconnectAttempts)
 
-    // Exponential backoff: base * 2^(attempt - 1) clamped to max, with +/- 20% jitter
-    const baseDelay = Math.min(
+    const MAX_DELAY_MS = 30_000
+    // Exponential backoff capped at 30 seconds: 1, 2, 4, 8, 16, 30, 30...
+    const rawDelay = Math.min(
       this.options.initialReconnectDelayMs * Math.pow(2, this.reconnectAttempts - 1),
-      this.options.maxReconnectDelayMs,
+      MAX_DELAY_MS,
     )
-    const jitter = (Math.random() - 0.5) * 0.4 * baseDelay
-    const delay = Math.max(500, Math.floor(baseDelay + jitter))
+    // +/- 20% jitter
+    const jitter = (Math.random() - 0.5) * 0.4 * rawDelay
+    let delay = Math.max(500, Math.floor(rawDelay + jitter))
+    if (delay > MAX_DELAY_MS) {
+      delay = MAX_DELAY_MS
+    }
+
+    // Battery saver / background throttle: clamp min delay to 30s if tab is hidden
+    if (typeof document !== 'undefined' && document.hidden) {
+      delay = Math.max(delay, MAX_DELAY_MS)
+    }
 
     useConnectionStore
       .getState()
       .setConnectionStep(
-        `Reconnecting in ${(delay / 1000).toFixed(1)}s (attempt ${this.reconnectAttempts}/${this.options.maxReconnectAttempts})...`,
+        `Reconnecting in ${(delay / 1000).toFixed(1)}s (attempt ${this.reconnectAttempts})...`,
       )
 
-    this.reconnectTimer = setTimeout(() => {
+    this.reconnectTimer = setTimeout(async () => {
+      this.reconnectTimer = null
       if (this.isIntentionalDisconnect) return
-      this.attemptRosbridgeConnection()
+      const ok = await this.attemptRosbridgeConnection()
+      if (!ok && !this.isIntentionalDisconnect && this.status === 'reconnecting' && !this.reconnectTimer) {
+        this.scheduleReconnect()
+      }
     }, delay)
   }
 
@@ -604,27 +649,54 @@ export class RosbridgeClient {
     this.assertReadOnlyAllowed('subscribe', topic)
   }
 
+  private startStableConnectionTimer(): void {
+    this.clearStableConnectionTimer()
+    this.stableConnectionTimer = setTimeout(() => {
+      this.stableConnectionTimer = null
+      if (this.status === 'connected') {
+        this.reconnectAttempts = 0
+      }
+    }, 10_000)
+  }
+
+  private clearStableConnectionTimer(): void {
+    if (this.stableConnectionTimer) {
+      clearTimeout(this.stableConnectionTimer)
+      this.stableConnectionTimer = null
+    }
+  }
+
   private transitionTo(status: ConnectionStatus, message?: string | null): void {
     this.status = status
     const store = useConnectionStore.getState()
 
     switch (status) {
       case 'connecting':
+        this.clearStableConnectionTimer()
         store.setConnecting(message || undefined)
         break
       case 'connected':
         store.setConnected()
+        this.startStableConnectionTimer()
         break
       case 'reconnecting':
-        store.setReconnecting()
+        this.clearStableConnectionTimer()
+        store.setReconnecting(this.reconnectAttempts)
+        useRosStatusStore
+          .getState()
+          .setStatus('disconnected', 'Link to robot is down; the ROS master state is unknown')
         break
       case 'disconnected':
+        this.clearStableConnectionTimer()
         store.setDisconnected(message)
         useRosStatusStore.getState().reset()
         break
       case 'error':
+        this.clearStableConnectionTimer()
         store.setError(message || 'Unknown connection error')
-        useRosStatusStore.getState().setStatus('master_unreachable', message)
+        useRosStatusStore
+          .getState()
+          .setStatus('disconnected', 'Link to robot is down; the ROS master state is unknown')
         break
     }
   }
@@ -642,6 +714,7 @@ export class RosbridgeClient {
       clearTimeout(this.reconnectTimer)
       this.reconnectTimer = null
     }
+    this.clearStableConnectionTimer()
   }
 
   private setupBrowserListeners(): void {

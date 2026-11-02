@@ -287,4 +287,21 @@ Later phases integrate cleanly through documented hooks without modifying `app/m
 - Readiness probes honestly report `"robot": "not_integrated"`.
 - WebSocket broadcasts on `"system"` contain solely real backend process metrics (server time, uptime seconds, active connections).
 
+---
+
+## 10. Reconnection Architecture & Link Resilience (Field-Tested 2026-11-02)
+
+Following the first live robot test at college, link drop resilience was hardened:
+
+### 10.1 Client Reconnection Policy
+- **Indefinite Backoff with Jitter:** Reconnect retries run indefinitely while auto-reconnect is active, using exponential backoff ($1\text{s}, 2\text{s}, 4\text{s}, 8\text{s}, 16\text{s}, 30\text{s}, 30\text{s}\dots$) clamped at 30 seconds with $\pm 20\%$ randomized jitter.
+- **Background Throttling:** When the browser tab is hidden (`document.hidden`), retry intervals clamp to a minimum of 30 seconds to conserve battery and avoid Wi-Fi congestion.
+- **State Reset:** Backoff attempt count resets to 0 after 10 seconds of continuous stable connection.
+- **User Override:** A prominent "Stop trying" control permits operators to permanently abort retries, immediately returning to `disconnected`.
+- **Honest Status Derivation:** When Link A (WebSocket) drops, ROS master state is classified strictly as `disconnected` with explanation `"Link to robot is down; the ROS master state is unknown"`. The `master_unreachable` status is reserved strictly for scenarios where Link A is connected but rosapi queries consistently fail.
+
+### 10.2 Open Architecture Item: Server-Side Hardening of rosbridge (Phase 13)
+- Under high Jetson load (SLAM + camera + rosapi), rosbridge Python WebSocket server memory and event loop saturation can lead to connection drops.
+- Phase 13 will introduce server-side hardening: setting socket buffer limits, ping timeouts, and separating telemetry broadcast channels from critical RPC calls.
+
 

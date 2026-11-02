@@ -25,6 +25,25 @@ export const useEventLogStore = create<EventLogState>()(
 
       addEvent: (event) =>
         set((state) => {
+          const first = state.events[0]
+          // Collapse repeated identical event titles
+          if (
+            first &&
+            first.title === event.title &&
+            first.type === event.type &&
+            (first.type === 'system' || first.type === 'safety' || first.title.toLowerCase().includes('reconnect'))
+          ) {
+            const countMatch = first.detail?.match(/\(repeated (\d+) times\)/)
+            const count = countMatch ? parseInt(countMatch[1], 10) + 1 : 2
+            const baseDetail = first.detail?.replace(/\s*\(repeated \d+ times\)/, '') ?? ''
+            const updatedFirst: UiEvent = {
+              ...first,
+              timestamp: new Date().toISOString(),
+              detail: `${baseDetail} (repeated ${count} times)`.trim(),
+            }
+            return { events: [updatedFirst, ...state.events.slice(1)] }
+          }
+
           const newEntry: UiEvent = {
             id: `evt-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
             timestamp: new Date().toISOString(),

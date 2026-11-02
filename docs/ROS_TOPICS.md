@@ -151,3 +151,20 @@ Downstream UI phases consume user-confirmed topic mappings rather than hard-code
 | `/joy` | `sensor_msgs/Joy` | Controller In | Input state from TGZ wireless 2.4GHz controller. | ❌ No |
 | `/scan` | `sensor_msgs/LaserScan` | Robot Out | 2D LiDAR range scan from RPLIDAR A1. | ❌ No |
 
+---
+
+## 6. Observed on Robot (Operator-Reported, 2026-11-02)
+
+During the first live robot test at college on 2026-11-02, the operator inspected the running ROS 1 Melodic environment. The following nodes and rosapi services were confirmed operational:
+
+- **Active Rosbridge & Introspection Nodes:**
+  - `/rosbridge_websocket` (`rosbridge_server/rosbridge_websocket`) on port 9090
+  - `/rosapi` (`rosapi/rosapi_node`) serving `/rosapi/get_time`, `/rosapi/topics`, `/rosapi/nodes`, `/rosapi/services`
+- **Active Core Topics:**
+  - `/rosout`, `/rosout_agg` (`rosgraph_msgs/Log`)
+  - `/tf` (`tf2_msgs/TFMessage`)
+- **Node Graph Status:**
+  - Base driver and SLAM nodes were loaded.
+  - LiDAR node was **not active** in default boot runbook (operator must run `roslaunch jetracer_ros lidar.launch` to start RPLIDAR driver publishing to `/scan`).
+  - CSI camera node printing `cannot launch node of type [gscam/gscam]` when `csi_camera.launch` was run (resolved via helper scripts and fallback pipeline in Phase 5).
+

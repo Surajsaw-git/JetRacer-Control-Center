@@ -27,6 +27,12 @@ export function isValidHostname(hostname: string): boolean {
   const trimmed = hostname.trim()
   if (trimmed.length < 1 || trimmed.length > 253) return false
 
+  // RFC 1123 / DNS disambiguation: If string consists purely of digits and dots,
+  // it cannot be a hostname. It must be evaluated strictly as an IPv4 address.
+  if (/^[\d.]+$/.test(trimmed)) {
+    return false
+  }
+
   // RFC 1123 label regex: alphanumeric with internal hyphens
   const labelRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/
   const parts = trimmed.split('.')

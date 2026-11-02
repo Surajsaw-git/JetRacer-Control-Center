@@ -67,3 +67,23 @@
 3. **Local Wi-Fi Reachability & Isolation:** `[UNKNOWN]`
    - College campus Wi-Fi networks frequently enforce AP client isolation, preventing direct laptop-to-robot or phone-to-robot socket communication.
    - The runbook recommends testing via a dedicated mobile hotspot or direct Ethernet connection.
+
+---
+
+## 6. Live Preflight & Field Test Verification (Operator-Reported, 2026-11-02)
+
+During the first live robot test at college, operator preflight checks confirmed:
+- **OS & Kernel:** Ubuntu 18.04.6 LTS (Bionic), kernel `4.9.337-tegra`, NVIDIA L4T R32.7.5.
+- **Python Environments:** Python 2.7.17 (default ROS 1 runtime) and Python 3.6.9.
+- **Network Interfaces:**
+  - `wlan0`: Connected to private Wi-Fi hotspot (`192.168.137.x` subnet). Power saving was active by default.
+  - `eth0`: Present, link down.
+- **Active Node Graph:**
+  - `rosbridge_websocket` and `rosapi` nodes successfully started on port 9090.
+  - Base driver and SLAM nodes active.
+  - **LiDAR node:** Missing from active node list in initial session (operator needs to explicitly launch `lidar.launch` before LiDAR and SLAM topics are fully populated).
+- **Resource Constraints:**
+  - System memory: ~900 MB free under active SLAM and CSI camera nodes.
+  - Round-trip ping latency to rosbridge was variable (50ms base, jumping to 133ms–321ms under load).
+- **Link Drop Behavior:**
+  - When connection severed under load, client retry loop exhausted in earlier build (`v0.6.0`); solved in `v0.6.2-field-fixes` with indefinite exponential backoff capped at 30s and honest status reporting.

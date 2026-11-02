@@ -17,7 +17,9 @@ export class RosStatusService {
   public async probeStatus(): Promise<RosMasterStatus> {
     const connectionStatus = useConnectionStore.getState().status
     if (connectionStatus !== 'connected') {
-      useRosStatusStore.getState().setStatus('disconnected')
+      useRosStatusStore
+        .getState()
+        .setStatus('disconnected', 'Link to robot is down; the ROS master state is unknown')
       return 'disconnected'
     }
 
@@ -32,7 +34,7 @@ export class RosStatusService {
       const latencyMs = Date.now() - startTime
       const rosTime = res?.time ?? null
 
-      useRosStatusStore.getState().updateHeartbeat(latencyMs, rosTime)
+      useRosStatusStore.getState().updateHeartbeat(latencyMs, rosTime, startTime)
       return useRosStatusStore.getState().status
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
