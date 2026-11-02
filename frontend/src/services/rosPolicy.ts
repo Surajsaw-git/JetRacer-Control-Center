@@ -113,6 +113,32 @@ export const MIN_LIDAR_THROTTLE_MS = 50
 export const MAX_LIDAR_RANGES_LENGTH = 8192
 
 /**
+ * Maximum concurrent OccupancyGrid subscriptions permitted over rosbridge (Phase 7A).
+ */
+export const MAX_MAP_SUBSCRIPTIONS = 1
+
+/**
+ * Minimum throttle interval (ms) enforced on OccupancyGrid subscriptions over rosbridge (max 1.0 Hz).
+ */
+export const MIN_MAP_THROTTLE_MS = 1000
+
+/**
+ * Maximum cell count for direct JSON streaming of OccupancyGrid (Phase 7A size guard).
+ * Maps larger than this limit must be fetched via GetMap snapshot or agent to prevent saturating robot CPU.
+ */
+export const MAX_MAP_CELLS = 250_000
+
+/**
+ * Maximum concurrent TFMessage subscriptions permitted (/tf and /tf_static) (Phase 7A).
+ */
+export const MAX_TF_SUBSCRIPTIONS = 2
+
+/**
+ * Maximum processed TF messages per second per subscription before rate-capping (Phase 7A).
+ */
+export const MAX_TF_RATE_HZ = 50
+
+/**
  * Approved outbound HTTP endpoints for on-robot video streaming (web_video_server).
  */
 export const ALLOWED_HTTP_VIDEO_ENDPOINTS = [
@@ -277,6 +303,96 @@ export function assertLidarSubscriptionAllowed(
   if (activeLidarSubscriptions >= MAX_LIDAR_SUBSCRIPTIONS) {
     throw new Error(
       `[SECURITY VIOLATION] Maximum active LiDAR subscriptions (${MAX_LIDAR_SUBSCRIPTIONS}) exceeded. Only one LaserScan stream may run concurrently over rosbridge.`,
+    )
+  }
+}
+
+/**
+ * Validates that an OccupancyGrid subscription satisfies all safety bounds (Phase 7A):
+ * 1. Only invoked by the specialized Map service ('MapService')
+ * 2. Throttle rate >= 1000ms (maximum 1.0 Hz)
+ * 3. Concurrent Map subscriptions strictly <= 1
+ * 4. Message type must be exactly 'nav_msgs/OccupancyGrid'
+ */
+export function assertMapSubscriptionAllowed(
+  caller: string,
+  messageType: string,
+  throttleRateMs: number,
+  activeMapSubscriptions: number,
+): void {
+  if (messageType !== 'nav_msgs/OccupancyGrid') {
+    throw new Error(
+      `[SECURITY VIOLATION] Map subscription requires "nav_msgs/OccupancyGrid", received "${messageType}".`,
+    )
+  }
+
+  if (caller !== 'MapService') {
+    throw new Error(
+      `[SECURITY VIOLATION] Unauthorized caller "${caller}" attempted Map subscription. Only MapService is permitted.`,
+    )
+  }
+
+  if (throttleRateMs < MIN_MAP_THROTTLE_MS) {
+    throw new Error(
+      `[SECURITY VIOLATION] Map throttle rate ${throttleRateMs}ms is below the minimum safety threshold (${MIN_MAP_THROTTLE_MS}ms).`,
+    )
+  }
+
+  if (activeMapSubscriptions >= MAX_MAP_SUBSCRIPTIONS) {
+    throw new Error(
+      `[SECURITY VIOLATION] Maximum active Map subscriptions (${MAX_MAP_SUBSCRIPTIONS}) exceeded. Only one OccupancyGrid stream may run concurrently over rosbridge.`,
+    )
+  }
+}
+
+/**
+ * Validates that a TF subscription satisfies all safety bounds (Phase 7A):
+ * 1. Only invoked by the specialized TF service ('TfService')
+ * 2. Concurrent TF subscriptions strictly <= 2 (/tf and /tf_static)
+ * 3. Message type must be exactly 'tf2_msgs/TFMessage'
+ */
+export function assertTfSubscriptionAllowed(
+  caller: string,
+  messageType: string,
+  activeTfSubscriptions: number,
+): void {
+  if (messageType !== 'tf2_msgs/TFMessage') {
+    throw new Error(
+      `[SECURITY VIOLATION] TF subscription requires "tf2_msgs/TFMessage", received "${messageType}".`,
+    )
+  }
+
+  if (caller !== 'TfService') {
+    throw new Error(
+      `[SECURITY VIOLATION] Unauthorized caller "${caller}" attempted TF subscription. Only TfService is permitted.`,
+    )
+  }
+
+  if (activeTfSubscriptions >= MAX_TF_SUBSCRIPTIONS) {
+    throw new Error(
+      `[SECURITY VIOLATION] Maximum active TF subscriptions (${MAX_TF_SUBSCRIPTIONS}) exceeded.`,
+    )
+  }
+}
+
+/**
+ * Validates that a snapshot call to nav_msgs/GetMap satisfies read-only bounds (Phase 7A):
+ * 1. Only invoked by the specialized Map service ('MapService')
+ * 2. Service type must be exactly 'nav_msgs/GetMap'
+ */
+export function assertGetMapServiceAllowed(
+  caller: string,
+  serviceType: string,
+): void {
+  if (serviceType !== 'nav_msgs/GetMap') {
+    throw new Error(
+      `[SECURITY VIOLATION] GetMap service call requires serviceType "nav_msgs/GetMap", received "${serviceType}".`,
+    )
+  }
+
+  if (caller !== 'MapService') {
+    throw new Error(
+      `[SECURITY VIOLATION] Unauthorized caller "${caller}" attempted GetMap call. Only MapService is permitted.`,
     )
   }
 }

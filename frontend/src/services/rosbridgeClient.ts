@@ -16,8 +16,12 @@ import {
   assertServiceAllowed,
   assertCameraCompressedSubscriptionAllowed,
   assertLidarSubscriptionAllowed,
+  assertMapSubscriptionAllowed,
+  assertTfSubscriptionAllowed,
+  assertGetMapServiceAllowed,
   MIN_CAMERA_THROTTLE_MS,
   MIN_LIDAR_THROTTLE_MS,
+  MIN_MAP_THROTTLE_MS,
 } from '@/services/rosPolicy'
 import { sanitizeRosJson } from '@/services/lidar/scanDecoder'
 import { rosDiscoveryService } from '@/services/rosDiscoveryService'
@@ -158,6 +162,8 @@ export class RosbridgeClient {
   private isIntentionalDisconnect: boolean = false
   private activeCameraSubscriptions: number = 0
   private activeLidarSubscriptions: number = 0
+  private activeMapSubscriptions: number = 0
+  private activeTfSubscriptions: number = 0
   private stableConnectionTimer: ReturnType<typeof setTimeout> | null = null
 
   constructor(options?: RosbridgeClientOptions) {
@@ -245,6 +251,8 @@ export class RosbridgeClient {
 
     this.activeCameraSubscriptions = 0
     this.activeLidarSubscriptions = 0
+    this.activeMapSubscriptions = 0
+    this.activeTfSubscriptions = 0
     this.reconnectAttempts = 0
     this.consecutiveFailedHeartbeats = 0
     this.transitionTo('disconnected', null)
@@ -268,6 +276,8 @@ export class RosbridgeClient {
 
     this.activeCameraSubscriptions = 0
     this.activeLidarSubscriptions = 0
+    this.activeMapSubscriptions = 0
+    this.activeTfSubscriptions = 0
     this.reconnectAttempts = 0
     this.consecutiveFailedHeartbeats = 0
     this.transitionTo('disconnected', 'Reconnection stopped by user.')
@@ -516,6 +526,8 @@ export class RosbridgeClient {
 
     this.activeCameraSubscriptions = 0
     this.activeLidarSubscriptions = 0
+    this.activeMapSubscriptions = 0
+    this.activeTfSubscriptions = 0
     this.scheduleReconnect()
   }
 
@@ -777,6 +789,161 @@ export class RosbridgeClient {
 
   public getActiveLidarSubscriptionsCount(): number {
     return this.activeLidarSubscriptions
+  }
+
+  /**
+   * Controlled subscription for 2D OccupancyGrid streams over rosbridge (Phase 7A).
+   * Strictly enforces caller identity ('MapService'), throttle floor (>=1000ms), and single active subscription.
+   */
+  public async subscribeOccupancyGrid(
+    topicName: string,
+    callback: (message: unknown) => void,
+    throttleRateMs: number = 1000,
+    caller: string = 'MapService',
+  ): Promise<() => void> {
+    assertMapSubscriptionAllowed(
+      caller,
+      'nav_msgs/OccupancyGrid',
+      throttleRateMs,
+      this.activeMapSubscriptions,
+    )
+
+    if (!this.ros || !this.ros.isConnected) {
+      throw new Error('Rosbridge socket is not connected.')
+    }
+
+    const { Topic } = await getRoslib()
+    const topic = new Topic({
+      ros: this.ros,
+      name: topicName,
+      messageType: 'nav_msgs/OccupancyGrid',
+      throttle_rate: Math.max(MIN_MAP_THROTTLE_MS, throttleRateMs),
+      queue_length: 1,
+    })
+
+    this.activeMapSubscriptions++
+    topic.subscribe(callback)
+
+    let cleanedUp = false
+    return () => {
+      if (cleanedUp) return
+      cleanedUp = true
+      this.activeMapSubscriptions = Math.max(0, this.activeMapSubscriptions - 1)
+      try {
+        topic.unsubscribe(callback)
+      } catch {
+        // Safe teardown
+      }
+    }
+  }
+
+  public getActiveMapSubscriptionsCount(): number {
+    return this.activeMapSubscriptions
+  }
+
+  /**
+   * Controlled subscription for TFMessage (/tf and /tf_static) streams over rosbridge (Phase 7A).
+   * Strictly enforces caller identity ('TfService') and maximum concurrent subscriptions (<=2).
+   */
+  public async subscribeTf(
+    topicName: string,
+    callback: (message: unknown) => void,
+    caller: string = 'TfService',
+  ): Promise<() => void> {
+    assertTfSubscriptionAllowed(
+      caller,
+      'tf2_msgs/TFMessage',
+      this.activeTfSubscriptions,
+    )
+
+    if (!this.ros || !this.ros.isConnected) {
+      throw new Error('Rosbridge socket is not connected.')
+    }
+
+    const { Topic } = await getRoslib()
+    const topic = new Topic({
+      ros: this.ros,
+      name: topicName,
+      messageType: 'tf2_msgs/TFMessage',
+      queue_length: 10,
+    })
+
+    this.activeTfSubscriptions++
+    topic.subscribe(callback)
+
+    let cleanedUp = false
+    return () => {
+      if (cleanedUp) return
+      cleanedUp = true
+      this.activeTfSubscriptions = Math.max(0, this.activeTfSubscriptions - 1)
+      try {
+        topic.unsubscribe(callback)
+      } catch {
+        // Safe teardown
+      }
+    }
+  }
+
+  public getActiveTfSubscriptionsCount(): number {
+    return this.activeTfSubscriptions
+  }
+
+  /**
+   * Read-only snapshot call to a discovered nav_msgs/GetMap service (Phase 7A).
+   * Enforces caller identity ('MapService') and read-only service execution.
+   */
+  public async callGetMapService<T = unknown>(
+    serviceName: string,
+    caller: string = 'MapService',
+    timeoutMs: number = 8000,
+  ): Promise<T> {
+    assertGetMapServiceAllowed(caller, 'nav_msgs/GetMap')
+
+    if (!this.ros || !this.ros.isConnected) {
+      throw new Error('Rosbridge socket is not connected.')
+    }
+
+    const { Service } = await getRoslib()
+    const service = new Service({
+      ros: this.ros,
+      name: serviceName,
+      serviceType: 'nav_msgs/GetMap',
+    })
+
+    return new Promise<T>((resolve, reject) => {
+      let settled = false
+      const timer = setTimeout(() => {
+        if (!settled) {
+          settled = true
+          reject(new Error(`Timeout calling nav_msgs/GetMap on "${serviceName}" after ${timeoutMs}ms.`))
+        }
+      }, timeoutMs)
+
+      try {
+        service.callService(
+          {},
+          (response: unknown) => {
+            if (settled) return
+            settled = true
+            clearTimeout(timer)
+            resolve(response as T)
+          },
+          (error: unknown) => {
+            if (settled) return
+            settled = true
+            clearTimeout(timer)
+            const msg = error instanceof Error ? error.message : String(error)
+            reject(new Error(`Failed to call GetMap on "${serviceName}": ${msg}`))
+          },
+        )
+      } catch (err) {
+        if (!settled) {
+          settled = true
+          clearTimeout(timer)
+          reject(err)
+        }
+      }
+    })
   }
 
   public getRosInstance(): Ros | null {

@@ -56,8 +56,12 @@ const MOCK_TOPICS = [
   { name: '/mock_world/camera/image_raw', type: 'sensor_msgs/Image' },
   { name: '/mock_world/camera/image_raw/compressed', type: 'sensor_msgs/CompressedImage' },
   { name: '/mock_world/cmd_vel', type: 'geometry_msgs/Twist' },
+  { name: '/mock_world/map', type: 'nav_msgs/OccupancyGrid' },
+  { name: '/map', type: 'nav_msgs/OccupancyGrid' },
   { name: '/mock_world/tf', type: 'tf2_msgs/TFMessage' },
   { name: '/mock_world/tf_static', type: 'tf2_msgs/TFMessage' },
+  { name: '/tf', type: 'tf2_msgs/TFMessage' },
+  { name: '/tf_static', type: 'tf2_msgs/TFMessage' },
   { name: '/mock_world/test_nan', type: 'sensor_msgs/Imu' },
 ];
 
@@ -196,6 +200,89 @@ function generateSyntheticJpeg(width = 320, height = 240, tick = 0) {
   return jpeg.encode({ data: frameData, width, height }, 70).data;
 }
 
+function generateSyntheticOccupancyGrid(tick = 0) {
+  const width = 60;
+  const height = 60;
+  const resolution = 0.05;
+  const data = new Array(width * height).fill(-1);
+
+  // Fill a room with walls: x: 10..50, y: 10..50
+  for (let y = 10; y <= 50; y++) {
+    for (let x = 10; x <= 50; x++) {
+      const idx = y * width + x;
+      if (x === 10 || x === 50 || y === 10 || y === 50) {
+        data[idx] = 100; // wall
+      } else if (x >= 25 && x <= 35 && y >= 25 && y <= 35) {
+        data[idx] = 100; // center obstacle box
+      } else {
+        data[idx] = 0; // free interior space
+      }
+    }
+  }
+
+  const nowSecs = Math.floor(Date.now() / 1000);
+  const nowNsecs = (Date.now() % 1000) * 1000000;
+
+  return {
+    header: {
+      seq: tick,
+      stamp: { secs: nowSecs, nsecs: nowNsecs },
+      frame_id: 'map',
+    },
+    info: {
+      map_load_time: { secs: nowSecs, nsecs: nowNsecs },
+      resolution,
+      width,
+      height,
+      origin: {
+        position: { x: -1.5, y: -1.5, z: 0.0 },
+        orientation: { x: 0.0, y: 0.0, z: 0.0, w: 1.0 },
+      },
+    },
+    data,
+  };
+}
+
+function generateSyntheticTf(tick = 0) {
+  const nowSecs = Math.floor(Date.now() / 1000);
+  const nowNsecs = (Date.now() % 1000) * 1000000;
+  const angle = (tick * 0.05) % (2 * Math.PI);
+  const x = Math.cos(angle) * 0.8;
+  const y = Math.sin(angle) * 0.5;
+  const yaw = angle + Math.PI / 2;
+  const qz = Math.sin(yaw / 2);
+  const qw = Math.cos(yaw / 2);
+
+  return {
+    transforms: [
+      {
+        header: { seq: tick, stamp: { secs: nowSecs, nsecs: nowNsecs }, frame_id: 'map' },
+        child_frame_id: 'odom',
+        transform: {
+          translation: { x: 0.0, y: 0.0, z: 0.0 },
+          rotation: { x: 0.0, y: 0.0, z: 0.0, w: 1.0 },
+        },
+      },
+      {
+        header: { seq: tick, stamp: { secs: nowSecs, nsecs: nowNsecs }, frame_id: 'odom' },
+        child_frame_id: 'base_footprint',
+        transform: {
+          translation: { x, y, z: 0.0 },
+          rotation: { x: 0.0, y: 0.0, z: qz, w: qw },
+        },
+      },
+      {
+        header: { seq: tick, stamp: { secs: nowSecs, nsecs: nowNsecs }, frame_id: 'base_footprint' },
+        child_frame_id: 'laser_frame',
+        transform: {
+          translation: { x: 0.15, y: 0.0, z: 0.1 },
+          rotation: { x: 0.0, y: 0.0, z: 0.0, w: 1.0 },
+        },
+      },
+    ],
+  };
+}
+
 const MOCK_NODES = [
   '/mock_world/base_controller',
   '/mock_world/lidar_node',
@@ -218,6 +305,7 @@ const MOCK_SERVICES = [
   '/rosapi/message_details',
   '/mock_world/status',
   '/mock_world/reset_sim',
+  '/static_map',
 ];
 
 console.log('================================================================');
@@ -388,6 +476,14 @@ if (flagHang) {
             values: { subscribers: ['/mock_world/imu_filter'] },
             result: true,
           });
+        } else if (msg.service === '/static_map' || msg.service === '/mock_world/static_map') {
+          respond({
+            op: 'service_response',
+            service: msg.service,
+            id: msg.id,
+            values: { map: generateSyntheticOccupancyGrid(0) },
+            result: true,
+          });
         } else {
           respond({
             op: 'service_response',
@@ -487,6 +583,15 @@ if (flagHang) {
               linear_acceleration: { x: NaN, y: Infinity, z: -Infinity },
               angular_velocity: { x: null, y: 0.0, z: 'test_string' },
             };
+          } else if (topic === '/mock_world/map' || topic === '/map') {
+            messageData = generateSyntheticOccupancyGrid(tick);
+          } else if (
+            topic === '/mock_world/tf' ||
+            topic === '/mock_world/tf_static' ||
+            topic === '/tf' ||
+            topic === '/tf_static'
+          ) {
+            messageData = generateSyntheticTf(tick);
           } else if (topic === '/mock_world/camera/image_raw/compressed') {
             if (flagCameraStall && tick > 10) {
               return; // Stall simulation
