@@ -44,6 +44,7 @@ export const defaultSettings = {
   safety: {
     maxSpeedPct: 50,
     commandTimeoutMs: 500,
+    allowRobotMutations: false,
   },
 }
 

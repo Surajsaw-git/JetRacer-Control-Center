@@ -28,6 +28,7 @@ const MAX_RING_BUFFER = 50
 
 export class LidarManager {
   private activeConsumers = new Map<string, (scan: DecodedLaserScan) => void>()
+  private scanSubscribers = new Set<(scan: DecodedLaserScan) => void>()
   private stateSubscribers = new Set<(state: LidarStreamState, error?: string | null) => void>()
   private metricsSubscribers = new Set<(metrics: LidarMetrics) => void>()
 
@@ -268,6 +269,11 @@ export class LidarManager {
     // Notify consumers
     for (const consumerFn of this.activeConsumers.values()) {
       consumerFn(scan)
+    }
+
+    // Notify scan subscribers
+    for (const sub of this.scanSubscribers) {
+      sub(scan)
     }
 
     // Notify metrics
@@ -533,6 +539,13 @@ export class LidarManager {
     }
   }
 
+  public subscribeScan(listener: (scan: DecodedLaserScan) => void): () => void {
+    this.scanSubscribers.add(listener)
+    return () => {
+      this.scanSubscribers.delete(listener)
+    }
+  }
+
   public subscribe(
     callback: (data: {
       scan: DecodedLaserScan | null
@@ -552,12 +565,12 @@ export class LidarManager {
 
     const stateUnsub = this.subscribeState(() => notify())
     const metricsUnsub = this.subscribeMetrics(() => notify())
-    const detach = this.attachConsumer(`_sub_${Math.random()}`, () => notify())
+    const scanUnsub = this.subscribeScan(() => notify())
 
     return () => {
       stateUnsub()
       metricsUnsub()
-      detach()
+      scanUnsub()
     }
   }
 
@@ -569,6 +582,7 @@ export class LidarManager {
       this.connectionUnsubscribe = null
     }
     this.activeConsumers.clear()
+    this.scanSubscribers.clear()
     this.stateSubscribers.clear()
     this.metricsSubscribers.clear()
     this.scanProcessor.reset()

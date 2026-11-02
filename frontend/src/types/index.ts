@@ -217,6 +217,7 @@ export interface ControlPreferences {
 export interface SafetyPreferences {
   maxSpeedPct: number
   commandTimeoutMs: number
+  allowRobotMutations?: boolean
 }
 
 export interface NavItem {

@@ -1,0 +1,9 @@
+# JetRacer Control Center — Robot Agent Command Service (Phase 7B)
+# Used for supervised lifecycle management (mapping start/stop, map save/list/load/delete)
+
+string command
+string args_json
+---
+bool success
+string message
+string payload_json
