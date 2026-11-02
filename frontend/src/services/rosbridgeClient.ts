@@ -26,54 +26,88 @@ import type { ConnectionStatus, RosTimestamp } from '@/types'
 /**
  * Installs transparent pre-parser hook for raw WebSocket text frames.
  * Sanitizes bare `Infinity` and `NaN` produced by ROS 1 python json.dumps before standard JSON.parse.
+ * Directly patches WebSocket.prototype.onmessage and addEventListener with a non-intrusive Proxy.
  */
 function installWebSocketSanitizer(): void {
-  if (typeof window === 'undefined' || !window.WebSocket) return
-  const OriginalWebSocket = window.WebSocket
-  if ((OriginalWebSocket as unknown as { __ros_sanitized?: boolean }).__ros_sanitized) return
+  if (typeof window === 'undefined' || !window.WebSocket || !window.WebSocket.prototype) return
 
-  class SanitizedWebSocket extends OriginalWebSocket {
-    static __ros_sanitized = true
-
-    set onmessage(handler: ((this: WebSocket, ev: MessageEvent) => unknown) | null) {
-      if (!handler) {
-        super.onmessage = null
-        return
-      }
-      super.onmessage = function (ev: MessageEvent) {
-        if (
-          typeof ev.data === 'string' &&
-          (ev.data.includes('Infinity') || ev.data.includes('NaN'))
-        ) {
-          const cleanData = sanitizeRosJson(ev.data)
-          try {
-            const cleanEv = new MessageEvent('message', {
-              data: cleanData,
-              origin: ev.origin,
-              lastEventId: ev.lastEventId,
-              source: ev.source,
-              ports: ev.ports ? [...ev.ports] : undefined,
-            })
-            return handler.call(this, cleanEv)
-          } catch {
-            try {
-              Object.defineProperty(ev, 'data', { value: cleanData, configurable: true })
-            } catch {
-              // Ignore if event object is frozen
-            }
-            return handler.call(this, ev)
-          }
-        }
-        return handler.call(this, ev)
-      }
-    }
-
-    get onmessage() {
-      return super.onmessage
-    }
+  const proto = window.WebSocket.prototype as unknown as {
+    __ros_proto_sanitized?: boolean
+    addEventListener: typeof WebSocket.prototype.addEventListener
   }
 
-  window.WebSocket = SanitizedWebSocket as unknown as typeof WebSocket
+  if (proto.__ros_proto_sanitized) return
+  proto.__ros_proto_sanitized = true
+
+  function wrapEventWithCleanData(ev: MessageEvent, cleanData: string): MessageEvent {
+    return new Proxy(ev, {
+      get(target, prop, receiver) {
+        if (prop === 'data') return cleanData
+        const val = Reflect.get(target, prop, receiver)
+        return typeof val === 'function' ? val.bind(target) : val
+      },
+    })
+  }
+
+  // 1. Intercept .onmessage setter/getter on prototype
+  const desc = Object.getOwnPropertyDescriptor(window.WebSocket.prototype, 'onmessage')
+  if (desc && desc.set) {
+    const origSet = desc.set
+    const origGet = desc.get
+
+    Object.defineProperty(window.WebSocket.prototype, 'onmessage', {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return origGet?.call(this)
+      },
+      set(handler: ((this: WebSocket, ev: MessageEvent) => unknown) | null) {
+        if (!handler) {
+          origSet.call(this, null)
+          return
+        }
+
+        origSet.call(this, function (this: WebSocket, ev: MessageEvent) {
+          if (
+            typeof ev.data === 'string' &&
+            (ev.data.includes('Infinity') || ev.data.includes('NaN'))
+          ) {
+            const cleanData = sanitizeRosJson(ev.data)
+            return handler.call(this, wrapEventWithCleanData(ev, cleanData))
+          }
+          return handler.call(this, ev)
+        })
+      },
+    })
+  }
+
+  // 2. Intercept addEventListener('message', ...) on prototype
+  const origAddEventListener = window.WebSocket.prototype.addEventListener
+  window.WebSocket.prototype.addEventListener = function (
+    this: WebSocket,
+    type: string,
+    listener: EventListenerOrEventListenerObject,
+    options?: boolean | AddEventListenerOptions,
+  ) {
+    if (type === 'message' && typeof listener === 'function') {
+      const wrapped = function (this: WebSocket, ev: Event) {
+        const msgEv = ev as MessageEvent
+        if (
+          typeof msgEv.data === 'string' &&
+          (msgEv.data.includes('Infinity') || msgEv.data.includes('NaN'))
+        ) {
+          const cleanData = sanitizeRosJson(msgEv.data)
+          return (listener as (e: MessageEvent) => void).call(
+            this,
+            wrapEventWithCleanData(msgEv, cleanData),
+          )
+        }
+        return (listener as (e: Event) => void).call(this, ev)
+      }
+      return origAddEventListener.call(this, type, wrapped, options)
+    }
+    return origAddEventListener.call(this, type, listener, options)
+  }
 }
 
 installWebSocketSanitizer()
@@ -209,6 +243,8 @@ export class RosbridgeClient {
       this.ros = null
     }
 
+    this.activeCameraSubscriptions = 0
+    this.activeLidarSubscriptions = 0
     this.reconnectAttempts = 0
     this.consecutiveFailedHeartbeats = 0
     this.transitionTo('disconnected', null)
@@ -230,6 +266,8 @@ export class RosbridgeClient {
       this.ros = null
     }
 
+    this.activeCameraSubscriptions = 0
+    this.activeLidarSubscriptions = 0
     this.reconnectAttempts = 0
     this.consecutiveFailedHeartbeats = 0
     this.transitionTo('disconnected', 'Reconnection stopped by user.')
@@ -476,6 +514,8 @@ export class RosbridgeClient {
       this.ros = null
     }
 
+    this.activeCameraSubscriptions = 0
+    this.activeLidarSubscriptions = 0
     this.scheduleReconnect()
   }
 

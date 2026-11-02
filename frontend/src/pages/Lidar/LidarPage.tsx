@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import {
   Play,
   Square,
@@ -7,7 +7,9 @@ import {
   HelpCircle,
   RefreshCw,
   Compass,
+  Loader2,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { PageHeader } from '@/components/common/PageHeader'
 import { LidarCanvas } from '@/components/common/LidarCanvas'
 import { LidarStatusPanel } from './LidarStatusPanel'
@@ -60,6 +62,11 @@ export function LidarPage() {
   const [metrics, setMetrics] = useState<LidarMetrics>(lidarManager.getMetrics())
   const [sectors, setSectors] = useState<LidarSectorReadouts | null>(lidarManager.getSectors())
   const [isPaused, setIsPaused] = useState<boolean>(false)
+  const [isStarting, setIsStarting] = useState<boolean>(false)
+  const isPausedRef = useRef(isPaused)
+  useEffect(() => {
+    isPausedRef.current = isPaused
+  }, [isPaused])
 
   const refreshTopics = () => {
     rosDiscoveryService.discoverAll().catch(() => {})
@@ -87,7 +94,7 @@ export function LidarPage() {
       setStreamState(state)
       setMetrics(m)
       setSectors(s)
-      if (!isPaused) {
+      if (!isPausedRef.current) {
         setCurrentScan(scan)
       }
     })
@@ -95,7 +102,7 @@ export function LidarPage() {
     return () => {
       unsub()
     }
-  }, [isPaused])
+  }, [])
 
   // CRITICAL: Unsubscribe when navigating away from the page
   useEffect(() => {
@@ -123,12 +130,21 @@ export function LidarPage() {
   const activeTopic = manualTopic.trim() || selectedTopic
 
   const handleStartStream = async () => {
-    if (!activeTopic) return
+    if (!activeTopic) {
+      toast.error('No LaserScan topic selected')
+      return
+    }
+    setIsStarting(true)
     setStoredTopic(activeTopic)
     try {
+      toast.info(`Starting LiDAR stream on ${activeTopic}...`)
       await lidarManager.start('LidarPage', activeTopic, throttleRateMs)
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      toast.error(`LiDAR start error: ${msg}`)
       console.error('[LidarPage] Error starting stream:', err)
+    } finally {
+      setIsStarting(false)
     }
   }
 
@@ -140,7 +156,11 @@ export function LidarPage() {
     setIsPaused((prev) => !prev)
   }
 
-  const isStreaming = streamState === 'streaming' || streamState === 'waiting'
+  const isStreaming =
+    streamState === 'streaming' ||
+    streamState === 'waiting' ||
+    streamState === 'degraded' ||
+    streamState === 'stalled'
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
@@ -233,15 +253,36 @@ export function LidarPage() {
           <div className="flex items-center gap-2">
             {!isStreaming ? (
               <Button
-                className="gap-2 bg-emerald-600 hover:bg-emerald-500 text-white min-w-[130px]"
-                disabled={!isRosConnected || !activeTopic}
+                className="gap-2 bg-emerald-600 hover:bg-emerald-500 text-white min-w-[140px]"
+                disabled={!isRosConnected || !activeTopic || isStarting}
                 onClick={handleStartStream}
               >
-                <Play className="w-4 h-4 fill-white" />
-                Start Stream
+                {isStarting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Starting...
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4 fill-white" />
+                    Start Stream
+                  </>
+                )}
               </Button>
             ) : (
               <>
+                {streamState === 'waiting' && (
+                  <span className="text-xs text-amber-400 flex items-center gap-1.5 mr-1 font-mono">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Subscribing...
+                  </span>
+                )}
+                {streamState === 'stalled' && (
+                  <span className="text-xs text-rose-400 flex items-center gap-1.5 mr-1 font-mono">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    Stalled (Reconnecting...)
+                  </span>
+                )}
                 <Button
                   variant="outline"
                   size="sm"

@@ -189,6 +189,7 @@ export class LidarManager {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       this.transitionTo('error', `Failed to subscribe to LiDAR: ${msg}`)
+      throw err
     }
   }
 
@@ -491,13 +492,17 @@ export class LidarManager {
   }
 
   public async start(consumerId: string, topic: string, throttleRateMs = 100): Promise<boolean> {
-    this.selectedTopic = topic.trim()
+    const cleanTopic = topic.trim()
+    const topicChanged = Boolean(this.selectedTopic && this.selectedTopic !== cleanTopic)
+    this.selectedTopic = cleanTopic
     this.throttleRateMs = Math.max(50, Math.min(1000, throttleRateMs))
     if (!this.activeConsumers.has(consumerId)) {
       this.attachConsumer(consumerId)
     }
     if (this.currentState !== 'streaming' && this.currentState !== 'waiting') {
       await this.startStream()
+    } else if (topicChanged) {
+      await this.restartStream()
     }
     return true
   }
