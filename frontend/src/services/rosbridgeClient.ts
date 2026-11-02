@@ -19,6 +19,7 @@ import {
   assertMapSubscriptionAllowed,
   assertTfSubscriptionAllowed,
   assertGetMapServiceAllowed,
+  assertAgentCommandServiceAllowed,
   MIN_CAMERA_THROTTLE_MS,
   MIN_LIDAR_THROTTLE_MS,
   MIN_MAP_THROTTLE_MS,
@@ -934,6 +935,71 @@ export class RosbridgeClient {
             clearTimeout(timer)
             const msg = error instanceof Error ? error.message : String(error)
             reject(new Error(`Failed to call GetMap on "${serviceName}": ${msg}`))
+          },
+        )
+      } catch (err) {
+        if (!settled) {
+          settled = true
+          clearTimeout(timer)
+          reject(err)
+        }
+      }
+    })
+  }
+
+  /**
+   * Calls the on-robot JCC agent command service (Phase 7B).
+   * Enforces caller identity ('AgentClient') and service type 'jetracer_cc_msgs/AgentCommand'.
+   */
+  public async callAgentCommand(
+    serviceName: string = '/jetracer_cc_agent/command',
+    command: string,
+    argsJson: string = '{}',
+    caller: string = 'AgentClient',
+    timeoutMs: number = 10000,
+  ): Promise<{ success: boolean; message: string; payload_json: string }> {
+    assertAgentCommandServiceAllowed(caller, 'jetracer_cc_msgs/AgentCommand')
+
+    if (!this.ros || !this.ros.isConnected) {
+      throw new Error('Rosbridge socket is not connected.')
+    }
+
+    const { Service } = await getRoslib()
+    const service = new Service({
+      ros: this.ros,
+      name: serviceName,
+      serviceType: 'jetracer_cc_msgs/AgentCommand',
+    })
+
+    return new Promise((resolve, reject) => {
+      let settled = false
+      const timer = setTimeout(() => {
+        if (!settled) {
+          settled = true
+          reject(new Error(`Timeout calling agent command "${command}" on "${serviceName}" after ${timeoutMs}ms.`))
+        }
+      }, timeoutMs)
+
+      try {
+        service.callService(
+          { command, args_json: argsJson },
+          (response: unknown) => {
+            if (settled) return
+            settled = true
+            clearTimeout(timer)
+            const res = response as { success?: boolean; message?: string; payload_json?: string }
+            resolve({
+              success: Boolean(res?.success),
+              message: res?.message || '',
+              payload_json: res?.payload_json || '{}',
+            })
+          },
+          (error: unknown) => {
+            if (settled) return
+            settled = true
+            clearTimeout(timer)
+            const msg = error instanceof Error ? error.message : String(error)
+            reject(new Error(`Failed to call agent command "${command}": ${msg}`))
           },
         )
       } catch (err) {

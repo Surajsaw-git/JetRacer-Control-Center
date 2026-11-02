@@ -396,3 +396,25 @@ export function assertGetMapServiceAllowed(
     )
   }
 }
+
+/**
+ * Validates that an agent service call satisfies caller identity and safety bounds (Phase 7B):
+ * 1. Only invoked by specialized AgentClient ('AgentClient')
+ * 2. Service type must be exactly 'jetracer_cc_msgs/AgentCommand'
+ */
+export function assertAgentCommandServiceAllowed(
+  caller: string,
+  serviceType: string,
+): void {
+  if (serviceType !== 'jetracer_cc_msgs/AgentCommand') {
+    throw new Error(
+      `[SECURITY VIOLATION] Agent service call requires "jetracer_cc_msgs/AgentCommand", received "${serviceType}".`,
+    )
+  }
+
+  if (caller !== 'AgentClient') {
+    throw new Error(
+      `[SECURITY VIOLATION] Unauthorized caller "${caller}" attempted AgentCommand call. Only AgentClient is permitted.`,
+    )
+  }
+}

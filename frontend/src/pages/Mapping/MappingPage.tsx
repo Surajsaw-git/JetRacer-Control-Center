@@ -40,7 +40,9 @@ import { useMapStore } from '@/store/mapStore'
 import { useRosDiscoveryStore } from '@/store/rosDiscoveryStore'
 import { topicRegistry } from '@/services/topicRegistry'
 import { useConnectionStore } from '@/store/connectionStore'
+import { useSettingsStore } from '@/store/settingsStore'
 import { rosDiscoveryService } from '@/services/rosDiscoveryService'
+import { agentClient } from '@/services/agent/agentClient'
 import type { DecodedOccupancyGrid, MapStreamState } from '@/services/map/mapTypes'
 import { toast } from 'sonner'
 
@@ -91,6 +93,77 @@ export function MappingPage() {
   const currentPose = useMapStore((s) => s.currentPose)
   const trail = useMapStore((s) => s.trail)
   const metrics = useMapStore((s) => s.metrics)
+
+  // Agent integration state (Phase 7B)
+  const isAgentDetected = discoServices.some((s) => s.name === '/jetracer_cc_agent/command')
+  const allowRobotMutations = useSettingsStore((s) => s.safety.allowRobotMutations ?? false)
+  const [isMappingActive, setIsMappingActive] = useState<boolean>(false)
+  const [mappingPid, setMappingPid] = useState<number | null>(null)
+  const [isTogglingSlam, setIsTogglingSlam] = useState<boolean>(false)
+
+  // Probe agent status when detected
+  useEffect(() => {
+    if (!isAgentDetected) return
+
+    let isMounted = true
+    const checkStatus = async () => {
+      try {
+        const st = await agentClient.getStatus()
+        if (isMounted) {
+          setIsMappingActive(st.isMapping)
+          setMappingPid(st.mappingPid)
+        }
+      } catch {
+        // Handled silently
+      }
+    }
+
+    checkStatus()
+    const timer = setInterval(checkStatus, 4000)
+    return () => {
+      isMounted = false
+      clearInterval(timer)
+    }
+  }, [isAgentDetected])
+
+  const handleToggleSlam = async () => {
+    if (!allowRobotMutations) {
+      toast.error('Robot actions are disabled in Settings. Enable "Allow Robot Actions" to proceed.')
+      return
+    }
+
+    setIsTogglingSlam(true)
+    try {
+      if (isMappingActive) {
+        toast.info('Stopping SLAM mapping on robot...')
+        const res = await agentClient.stopMapping()
+        if (res.success) {
+          toast.success('SLAM stopped.')
+          setIsMappingActive(false)
+          setMappingPid(null)
+        } else {
+          toast.error(`Failed to stop SLAM: ${res.message}`)
+        }
+      } else {
+        toast.info('Launching SLAM mapping on robot...')
+        const res = await agentClient.startMapping()
+        if (res.success) {
+          toast.success(`SLAM started (PID ${res.pid ?? 'active'}).`)
+          setIsMappingActive(true)
+          setMappingPid(res.pid ?? null)
+          // Trigger rediscovery to pick up /map topic
+          setTimeout(() => rosDiscoveryService.discoverAll().catch(() => {}), 2000)
+        } else {
+          toast.error(`Failed to start SLAM: ${res.message}`)
+        }
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      toast.error(`SLAM command error: ${msg}`)
+    } finally {
+      setIsTogglingSlam(false)
+    }
+  }
 
   const refreshTopics = () => {
     rosDiscoveryService.discoverAll().catch(() => {})
@@ -203,19 +276,55 @@ export function MappingPage() {
       <PageHeader
         title="Mapping & SLAM"
         description="Synchronous Localization and Mapping (Gmapping / Cartographer) occupancy grid generation & TF robot tracking"
-        phase="Phase 7A"
+        phase="Phase 7B"
         actions={
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled
-              title="Robot Agent not detected in Stage 7A. Run 'roslaunch jetracer slam.launch' manually on the robot."
-              className="text-xs gap-1.5"
-            >
-              <Terminal className="h-3.5 w-3.5 text-zinc-500" />
-              <span>Start SLAM (Agent Req.)</span>
-            </Button>
+            {!isAgentDetected ? (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled
+                title="Robot Agent not detected. Start agent on car: ~/jetracer-cc/robot/scripts/start_agent.sh"
+                className="text-xs gap-1.5"
+              >
+                <Terminal className="h-3.5 w-3.5 text-zinc-500" />
+                <span>Agent Offline</span>
+              </Button>
+            ) : !allowRobotMutations ? (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled
+                title="Robot actions disabled in Settings. Enable 'Allow Robot Actions' in Settings to launch SLAM."
+                className="text-xs gap-1.5 text-amber-400 border-amber-500/30"
+              >
+                <Terminal className="h-3.5 w-3.5 text-amber-400" />
+                <span>Actions Disabled</span>
+              </Button>
+            ) : (
+              <Button
+                variant={isMappingActive ? 'destructive' : 'default'}
+                size="sm"
+                onClick={handleToggleSlam}
+                disabled={isTogglingSlam}
+                className="text-xs gap-1.5"
+              >
+                {isTogglingSlam ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : isMappingActive ? (
+                  <Square className="h-3.5 w-3.5 fill-current" />
+                ) : (
+                  <Play className="h-3.5 w-3.5 fill-current" />
+                )}
+                <span>
+                  {isTogglingSlam
+                    ? 'Working...'
+                    : isMappingActive
+                      ? `Stop SLAM${mappingPid ? ` (${mappingPid})` : ''}`
+                      : 'Start SLAM (Robot)'}
+                </span>
+              </Button>
+            )}
           </div>
         }
       />

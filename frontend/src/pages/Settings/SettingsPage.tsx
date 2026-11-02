@@ -341,6 +341,22 @@ export function SettingsPage() {
                   immediately halt.
                 </p>
               </div>
+
+              <div className="flex items-center justify-between pt-3 border-t border-border">
+                <div className="space-y-0.5">
+                  <Label htmlFor="allow-mutations-toggle" className="text-xs font-semibold">
+                    Allow Robot Actions (Stage 7B & Phase 8)
+                  </Label>
+                  <p className="text-[11px] text-muted-foreground">
+                    Enables dispatching commands to the on-robot JCC agent (starting/stopping mapping, saving/deleting maps on car). Keep disabled for pure read-only monitoring.
+                  </p>
+                </div>
+                <Switch
+                  id="allow-mutations-toggle"
+                  checked={settings.safety.allowRobotMutations ?? false}
+                  onCheckedChange={(checked) => settings.updateSafety({ allowRobotMutations: checked })}
+                />
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
