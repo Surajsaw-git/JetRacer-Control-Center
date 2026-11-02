@@ -36,6 +36,13 @@ for WS in "${HOME}/catkin_ws" "${HOME}/jetracer_ws" "${HOME}/ros_ws"; do
     fi
 done
 
+# 2b. Source JCC Agent Workspace only if present
+if [ -f "${HOME}/jcc_ws/devel/setup.bash" ]; then
+    echo "Sourcing JCC Agent workspace: ${HOME}/jcc_ws/devel/setup.bash"
+    # shellcheck disable=SC1090
+    source "${HOME}/jcc_ws/devel/setup.bash"
+fi
+
 echo "ROS Distribution: ${ROS_DISTRO}"
 
 # 3. Check if ROS Master / roscore is active
